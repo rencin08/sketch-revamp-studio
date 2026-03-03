@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Mail, Linkedin, Instagram, ArrowRight, Sparkles, BookOpen,
   Briefcase, PanelLeftClose, PanelLeftOpen, Plus, StickyNote,
-  Archive, X, ChevronDown, ChevronUp, Camera, Calendar, Send, MessageCircle
+  Archive, X, ChevronDown, ChevronUp, Camera, Calendar, Send, MessageCircle,
+  Tag, Hash
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -26,6 +27,17 @@ const socialLinks = [
   { icon: Instagram, href: "https://instagram.com/dearccindy", label: "IG" },
 ];
 
+const DEFAULT_TAGS = ["idea", "todo", "reflection", "random", "work", "personal"];
+
+const TAG_COLORS: Record<string, string> = {
+  idea: "bg-[hsl(48,60%,90%)] text-[hsl(40,50%,35%)]",
+  todo: "bg-[hsl(28,45%,90%)] text-[hsl(25,40%,35%)]",
+  reflection: "bg-[hsl(200,30%,90%)] text-[hsl(200,25%,40%)]",
+  random: "bg-[hsl(320,25%,92%)] text-[hsl(320,20%,40%)]",
+  work: "bg-[hsl(150,25%,90%)] text-[hsl(150,20%,35%)]",
+  personal: "bg-[hsl(270,25%,92%)] text-[hsl(270,20%,40%)]",
+};
+
 const MacDots = () => (
   <div className="flex gap-1.5 absolute top-4 right-4">
     <div className="w-2.5 h-2.5 rounded-full bg-foreground/15" />
@@ -37,7 +49,7 @@ const MacDots = () => (
 // --- Animated Writing Avatar ---
 const WritingAvatar = () => (
   <motion.div
-    className="flex items-end gap-3 mb-6"
+    className="flex items-end gap-3 mb-4"
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay: 0.3, duration: 0.5 }}
@@ -50,7 +62,6 @@ const WritingAvatar = () => (
       >
         <img src={avatar} alt="Cindy writing" className="w-full h-full object-cover" />
       </motion.div>
-      {/* Pencil animation */}
       <motion.div
         className="absolute -bottom-1 -right-1 text-accent"
         animate={{ rotate: [0, 15, -5, 10, 0], y: [0, -2, 1, -1, 0] }}
@@ -79,27 +90,6 @@ const WritingAvatar = () => (
   </motion.div>
 );
 
-// --- Ambient floating elements for Today ---
-const FloatingElements = () => (
-  <div className="absolute inset-0 pointer-events-none overflow-hidden">
-    {[
-      { x: "10%", y: "20%", delay: 0, size: 4 },
-      { x: "80%", y: "15%", delay: 1.5, size: 3 },
-      { x: "60%", y: "70%", delay: 3, size: 5 },
-      { x: "25%", y: "85%", delay: 2, size: 3 },
-      { x: "90%", y: "50%", delay: 4, size: 4 },
-    ].map((dot, i) => (
-      <motion.div
-        key={i}
-        className="absolute rounded-full bg-accent/10"
-        style={{ left: dot.x, top: dot.y, width: dot.size, height: dot.size }}
-        animate={{ y: [0, -8, 0], opacity: [0.3, 0.6, 0.3] }}
-        transition={{ duration: 4, repeat: Infinity, delay: dot.delay, ease: "easeInOut" }}
-      />
-    ))}
-  </div>
-);
-
 // --- Types ---
 
 interface PinItem {
@@ -107,6 +97,7 @@ interface PinItem {
   type: "note" | "photo";
   content: string;
   caption?: string;
+  tags: string[];
   createdAt: number;
   archived: boolean;
 }
@@ -123,7 +114,10 @@ const STORAGE_KEY = "cindy-today-pins";
 const CHAT_KEY = "cindy-chat-messages";
 
 const loadPins = (): PinItem[] => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    return raw.map((p: any) => ({ ...p, tags: p.tags || [] }));
+  } catch { return []; }
 };
 const savePins = (pins: PinItem[]) => localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
 
@@ -132,7 +126,6 @@ const loadChatMessages = (): ChatMessage[] => {
 };
 const saveChatMessages = (msgs: ChatMessage[]) => localStorage.setItem(CHAT_KEY, JSON.stringify(msgs));
 
-// --- Greeting based on time ---
 const getGreeting = () => {
   const h = new Date().getHours();
   if (h < 12) return "good morning";
@@ -147,6 +140,9 @@ const Home = () => {
   const [pins, setPins] = useState<PinItem[]>(loadPins);
   const [showArchive, setShowArchive] = useState(false);
   const [noteContent, setNoteContent] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showTagPicker, setShowTagPicker] = useState(false);
+  const [archiveFilter, setArchiveFilter] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(loadChatMessages);
   const [chatInput, setChatInput] = useState("");
   const [chatName, setChatName] = useState(() => localStorage.getItem("cindy-chat-name") || "");
@@ -171,14 +167,12 @@ const Home = () => {
     }
   }, [noteContent]);
 
-  // Auto-focus textarea on mount
   useEffect(() => {
     if (activeTab === "today") {
       setTimeout(() => textareaRef.current?.focus(), 300);
     }
   }, [activeTab]);
 
-  // Scroll chat to bottom
   useEffect(() => {
     if (activeTab === "messages") {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -187,6 +181,18 @@ const Home = () => {
 
   const activePins = pins.filter((p) => !p.archived);
   const archivedPins = pins.filter((p) => p.archived);
+  const filteredArchive = archiveFilter
+    ? archivedPins.filter((p) => p.tags.includes(archiveFilter))
+    : archivedPins;
+
+  // Collect all unique tags from archived pins
+  const archiveTags = [...new Set(archivedPins.flatMap((p) => p.tags))];
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
 
   const addPhoto = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -196,21 +202,23 @@ const Home = () => {
       reader.onload = () => {
         setPins((prev) => [{
           id: crypto.randomUUID(), type: "photo", content: reader.result as string,
-          caption: "", createdAt: Date.now(), archived: false,
+          caption: "", tags: [...selectedTags], createdAt: Date.now(), archived: false,
         }, ...prev]);
       };
       reader.readAsDataURL(file);
     });
     e.target.value = "";
-  }, []);
+  }, [selectedTags]);
 
   const saveNote = () => {
     if (!noteContent.trim()) return;
     setPins((prev) => [{
       id: crypto.randomUUID(), type: "note", content: noteContent.trim(),
-      createdAt: Date.now(), archived: false,
+      tags: [...selectedTags], createdAt: Date.now(), archived: false,
     }, ...prev]);
     setNoteContent("");
+    setSelectedTags([]);
+    setShowTagPicker(false);
   };
 
   const archivePin = (id: string) => setPins((prev) => prev.map((p) => p.id === id ? { ...p, archived: true } : p));
@@ -221,15 +229,9 @@ const Home = () => {
   const sendChatMessage = () => {
     if (!chatInput.trim()) return;
     const name = chatName.trim() || "Anonymous";
-    if (!chatName.trim() && !showNameInput) {
-      // First message without a name - just send as anonymous
-    }
     localStorage.setItem("cindy-chat-name", name);
     setChatMessages((prev) => [...prev, {
-      id: crypto.randomUUID(),
-      name,
-      message: chatInput.trim(),
-      createdAt: Date.now(),
+      id: crypto.randomUUID(), name, message: chatInput.trim(), createdAt: Date.now(),
     }]);
     setChatInput("");
     chatInputRef.current?.focus();
@@ -241,13 +243,24 @@ const Home = () => {
     { id: "messages" as const, label: "Messages", icon: MessageCircle },
   ];
 
+  const renderPinTags = (tags: string[]) => {
+    if (tags.length === 0) return null;
+    return (
+      <div className="flex flex-wrap gap-1 mt-2">
+        {tags.map((tag) => (
+          <span
+            key={tag}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-body ${TAG_COLORS[tag] || "bg-muted text-muted-foreground"}`}
+          >
+            #{tag}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="relative min-h-screen bg-background">
-      <div
-        className="fixed right-0 bottom-0 w-2/3 h-full bg-contain bg-right-bottom bg-no-repeat opacity-[0.07] pointer-events-none"
-        style={{ backgroundImage: `url(${cityscape})` }}
-      />
-
       <div className="relative z-10 h-screen">
         <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* LEFT PANEL */}
@@ -330,7 +343,7 @@ const Home = () => {
           {/* RIGHT PANEL */}
           <ResizablePanel defaultSize={collapsed ? 100 : 72}>
             <div className="h-full overflow-hidden bg-background flex flex-col">
-              {/* Toolbar - fixed */}
+              {/* Toolbar */}
               <div className="px-6 md:px-10 pt-6 pb-2 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                   <button
@@ -339,8 +352,6 @@ const Home = () => {
                   >
                     {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
                   </button>
-
-                  {/* Tabs */}
                   <div className="flex items-center gap-1 bg-card/60 rounded-xl p-1 border border-border">
                     {tabs.map((tab) => (
                       <button
@@ -361,39 +372,61 @@ const Home = () => {
                 <p className="font-body text-xs tracking-widest text-muted-foreground uppercase hidden md:block">{formattedDate}</p>
               </div>
 
-              {/* Content - scrollable */}
+              {/* Content */}
               <div className="flex-1 overflow-y-auto">
-                <div className="max-w-3xl mx-auto px-6 md:px-10 py-4">
+                {/* ============ TODAY TAB ============ */}
+                {activeTab === "today" && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="today">
+                    {/* NYC Cityscape Hero */}
+                    <div className="relative overflow-hidden" style={{ minHeight: 180 }}>
+                      <div
+                        className="absolute inset-0 bg-contain bg-bottom bg-no-repeat opacity-[0.08]"
+                        style={{ backgroundImage: `url(${cityscape})` }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-b from-background/0 via-background/30 to-background" />
+                      <div className="relative max-w-3xl mx-auto px-6 md:px-10 pt-4 pb-6">
+                        <motion.p
+                          className="font-body text-sm text-muted-foreground/60 mb-1"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.2 }}
+                        >
+                          {getGreeting()} ☀️
+                        </motion.p>
+                        <h1 className="font-display italic text-4xl md:text-5xl text-foreground mb-3 mt-1">Today</h1>
+                        <WritingAvatar />
+                      </div>
+                    </div>
 
-                  {/* ============ TODAY TAB ============ */}
-                  {activeTab === "today" && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="today" className="relative">
-                      <FloatingElements />
-
-                      <motion.p
-                        className="font-body text-sm text-muted-foreground/60 mb-1"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.2 }}
-                      >
-                        {getGreeting()} ☀️
-                      </motion.p>
-                      <h1 className="font-display italic text-4xl md:text-5xl text-foreground mb-5 mt-1">Today</h1>
-
-                      {/* Writing avatar animation */}
-                      <WritingAvatar />
-
-                      {/* Instant writing area - bigger, more inviting */}
-                      <div className="relative mb-6">
-                        <div className="rounded-2xl border border-border/60 bg-card/30 p-5 focus-within:border-accent/30 focus-within:bg-card/50 transition-all">
+                    {/* Main content area */}
+                    <div className="max-w-3xl mx-auto px-6 md:px-10">
+                      {/* Writing area */}
+                      <div className="relative mb-5 -mt-2">
+                        <div className="rounded-2xl border border-border/60 bg-card/40 p-5 focus-within:border-accent/30 focus-within:bg-card/60 transition-all shadow-sm">
                           <textarea
                             ref={textareaRef}
                             value={noteContent}
                             onChange={(e) => setNoteContent(e.target.value)}
                             placeholder="dump your thoughts here... what are you thinking about? what happened today? anything goes ✏️"
-                            className="w-full bg-transparent font-body text-base md:text-lg text-foreground/90 leading-relaxed resize-none outline-none placeholder:text-muted-foreground/35 min-h-[140px]"
+                            className="w-full bg-transparent font-body text-base md:text-lg text-foreground/90 leading-relaxed resize-none outline-none placeholder:text-muted-foreground/35 min-h-[100px]"
                             onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) saveNote(); }}
                           />
+
+                          {/* Tags */}
+                          {selectedTags.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                              {selectedTags.map((tag) => (
+                                <button
+                                  key={tag}
+                                  onClick={() => toggleTag(tag)}
+                                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${TAG_COLORS[tag] || "bg-muted text-muted-foreground"}`}
+                                >
+                                  #{tag} <X size={10} />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
                           <div className="flex items-center justify-between mt-2 pt-3 border-t border-border/30">
                             <div className="flex items-center gap-2">
                               <button onClick={() => fileInputRef.current?.click()}
@@ -401,6 +434,47 @@ const Home = () => {
                                 <Camera size={13} /> Photo
                               </button>
                               <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={addPhoto} />
+
+                              {/* Tag button */}
+                              <div className="relative">
+                                <button
+                                  onClick={() => setShowTagPicker(!showTagPicker)}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/50 font-body text-xs transition-all ${
+                                    showTagPicker || selectedTags.length > 0
+                                      ? "bg-accent/10 border-accent/30 text-foreground"
+                                      : "hover:bg-accent/10 hover:border-accent/30 text-muted-foreground hover:text-foreground"
+                                  }`}
+                                >
+                                  <Hash size={13} /> Tag {selectedTags.length > 0 && `(${selectedTags.length})`}
+                                </button>
+                                <AnimatePresence>
+                                  {showTagPicker && (
+                                    <motion.div
+                                      initial={{ opacity: 0, y: -5, scale: 0.95 }}
+                                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                                      exit={{ opacity: 0, y: -5, scale: 0.95 }}
+                                      className="absolute bottom-full left-0 mb-2 bg-card border border-border rounded-xl p-2 shadow-lg z-20 min-w-[180px]"
+                                    >
+                                      <p className="font-body text-[10px] text-muted-foreground/50 uppercase tracking-widest px-2 mb-1.5">Add tags</p>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {DEFAULT_TAGS.map((tag) => (
+                                          <button
+                                            key={tag}
+                                            onClick={() => toggleTag(tag)}
+                                            className={`px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${
+                                              selectedTags.includes(tag)
+                                                ? `${TAG_COLORS[tag]} ring-1 ring-accent/30`
+                                                : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                                            }`}
+                                          >
+                                            #{tag}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
                             </div>
                             <AnimatePresence>
                               {noteContent.trim() && (
@@ -444,11 +518,13 @@ const Home = () => {
                                       <div className="p-3">
                                         <input type="text" value={pin.caption || ""} onChange={(e) => updateCaption(pin.id, e.target.value)}
                                           placeholder="Add a caption..." className="w-full bg-transparent font-body text-xs text-foreground/70 outline-none placeholder:text-muted-foreground/40" />
+                                        {renderPinTags(pin.tags)}
                                       </div>
                                     </>
                                   ) : (
                                     <div className="p-4">
                                       <p className="font-body text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">{pin.content}</p>
+                                      {renderPinTags(pin.tags)}
                                       <p className="font-body text-xs text-muted-foreground/50 mt-3">
                                         {new Date(pin.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                                       </p>
@@ -461,10 +537,10 @@ const Home = () => {
                         </div>
                       )}
 
-                      {/* Empty state - more inviting */}
+                      {/* Empty state */}
                       {activePins.length === 0 && (
                         <motion.div
-                          className="text-center py-16"
+                          className="text-center py-12"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: 0.5 }}
@@ -473,7 +549,7 @@ const Home = () => {
                             animate={{ y: [0, -5, 0] }}
                             transition={{ duration: 3, repeat: Infinity }}
                           >
-                            <StickyNote size={32} className="text-accent/20 mx-auto mb-4" />
+                            <StickyNote size={28} className="text-accent/20 mx-auto mb-3" />
                           </motion.div>
                           <p className="font-body text-sm text-muted-foreground/40">start typing above to pin your first thought</p>
                           <p className="font-body text-xs text-muted-foreground/25 mt-1">photos, ideas, reminders — anything goes</p>
@@ -482,7 +558,7 @@ const Home = () => {
 
                       {/* Archive */}
                       {archivedPins.length > 0 && (
-                        <div className="mt-8 pt-4 border-t border-border/50">
+                        <div className="mt-6 pt-4 border-t border-border/50 pb-8">
                           <button onClick={() => setShowArchive(!showArchive)}
                             className="flex items-center gap-2 font-body text-xs tracking-widest text-muted-foreground uppercase hover:text-foreground transition-colors w-full">
                             <Archive size={14} /> Archive ({archivedPins.length})
@@ -490,34 +566,73 @@ const Home = () => {
                           </button>
                           <AnimatePresence>
                             {showArchive && (
-                              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                                className="mt-4 columns-2 md:columns-3 gap-3 space-y-3 overflow-hidden">
-                                {archivedPins.map((pin) => (
-                                  <div key={pin.id} className="break-inside-avoid rounded-2xl border border-border/50 bg-card/50 overflow-hidden group relative opacity-60 hover:opacity-100 transition-opacity">
-                                    <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button onClick={() => unarchivePin(pin.id)} className="p-1.5 rounded-lg bg-background/80 text-xs font-body text-muted-foreground hover:text-foreground">Restore</button>
-                                      <button onClick={() => deletePin(pin.id)} className="p-1.5 rounded-lg bg-background/80 text-muted-foreground hover:text-destructive"><X size={12} /></button>
-                                    </div>
-                                    {pin.type === "photo" ? (
-                                      <>
-                                        <img src={pin.content} alt="" className="w-full object-cover" />
-                                        {pin.caption && <div className="p-3"><p className="font-body text-xs text-foreground/50">{pin.caption}</p></div>}
-                                      </>
-                                    ) : (
-                                      <div className="p-4"><p className="font-body text-sm text-foreground/60 whitespace-pre-wrap">{pin.content}</p></div>
-                                    )}
+                              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                                {/* Tag filter for archive */}
+                                {archiveTags.length > 0 && (
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-4 mb-3">
+                                    <Tag size={12} className="text-muted-foreground/40" />
+                                    <button
+                                      onClick={() => setArchiveFilter(null)}
+                                      className={`px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${
+                                        !archiveFilter ? "bg-accent/15 text-accent" : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                                      }`}
+                                    >
+                                      All
+                                    </button>
+                                    {archiveTags.map((tag) => (
+                                      <button
+                                        key={tag}
+                                        onClick={() => setArchiveFilter(archiveFilter === tag ? null : tag)}
+                                        className={`px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${
+                                          archiveFilter === tag
+                                            ? `${TAG_COLORS[tag]} ring-1 ring-accent/30`
+                                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                                        }`}
+                                      >
+                                        #{tag}
+                                      </button>
+                                    ))}
                                   </div>
-                                ))}
+                                )}
+                                <div className="mt-3 columns-2 md:columns-3 gap-3 space-y-3">
+                                  {filteredArchive.map((pin) => (
+                                    <div key={pin.id} className="break-inside-avoid rounded-2xl border border-border/50 bg-card/50 overflow-hidden group relative opacity-60 hover:opacity-100 transition-opacity">
+                                      <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => unarchivePin(pin.id)} className="p-1.5 rounded-lg bg-background/80 text-xs font-body text-muted-foreground hover:text-foreground">Restore</button>
+                                        <button onClick={() => deletePin(pin.id)} className="p-1.5 rounded-lg bg-background/80 text-muted-foreground hover:text-destructive"><X size={12} /></button>
+                                      </div>
+                                      {pin.type === "photo" ? (
+                                        <>
+                                          <img src={pin.content} alt="" className="w-full object-cover" />
+                                          {pin.caption && <div className="p-3"><p className="font-body text-xs text-foreground/50">{pin.caption}</p></div>}
+                                          {pin.tags.length > 0 && <div className="px-3 pb-2">{renderPinTags(pin.tags)}</div>}
+                                        </>
+                                      ) : (
+                                        <div className="p-4">
+                                          <p className="font-body text-sm text-foreground/60 whitespace-pre-wrap">{pin.content}</p>
+                                          {renderPinTags(pin.tags)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {filteredArchive.length === 0 && (
+                                    <div className="col-span-full text-center py-6">
+                                      <p className="font-body text-xs text-muted-foreground/40">No archived items with this tag</p>
+                                    </div>
+                                  )}
+                                </div>
                               </motion.div>
                             )}
                           </AnimatePresence>
                         </div>
                       )}
-                    </motion.div>
-                  )}
+                    </div>
+                  </motion.div>
+                )}
 
-                  {/* ============ CALENDAR TAB ============ */}
-                  {activeTab === "calendar" && (
+                {/* ============ CALENDAR TAB ============ */}
+                {activeTab === "calendar" && (
+                  <div className="max-w-3xl mx-auto px-6 md:px-10 py-4">
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="calendar">
                       <h1 className="font-display italic text-4xl md:text-5xl text-foreground mb-4 mt-4">Let's Meet</h1>
                       <div className="w-full h-px bg-border mb-6" />
@@ -535,10 +650,12 @@ const Home = () => {
                         />
                       </div>
                     </motion.div>
-                  )}
+                  </div>
+                )}
 
-                  {/* ============ MESSAGES TAB (iMessage style) ============ */}
-                  {activeTab === "messages" && (
+                {/* ============ MESSAGES TAB ============ */}
+                {activeTab === "messages" && (
+                  <div className="max-w-3xl mx-auto px-6 md:px-10 py-4">
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="messages" className="flex flex-col" style={{ minHeight: "calc(100vh - 140px)" }}>
                       <div className="mb-4">
                         <h1 className="font-display italic text-4xl md:text-5xl text-foreground mt-4">Messages</h1>
@@ -547,11 +664,8 @@ const Home = () => {
                         </p>
                       </div>
 
-                      {/* Chat area */}
                       <div className="flex-1 rounded-2xl border border-border bg-card/30 overflow-hidden flex flex-col">
-                        {/* Messages */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px]">
-                          {/* Welcome message from Cindy */}
                           <div className="flex items-end gap-2 max-w-[75%]">
                             <div className="w-7 h-7 rounded-full overflow-hidden border border-accent/30 shrink-0">
                               <img src={avatar} alt="Cindy" className="w-full h-full object-cover" />
@@ -565,7 +679,7 @@ const Home = () => {
                             </motion.div>
                           </div>
 
-                          {chatMessages.map((msg, i) => (
+                          {chatMessages.map((msg) => (
                             <motion.div
                               key={msg.id}
                               initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -583,13 +697,9 @@ const Home = () => {
                                 </div>
                               )}
                               <div className={`rounded-2xl px-4 py-2.5 ${
-                                msg.isOwner
-                                  ? "bg-secondary rounded-bl-md"
-                                  : "bg-accent text-accent-foreground rounded-br-md"
+                                msg.isOwner ? "bg-secondary rounded-bl-md" : "bg-accent text-accent-foreground rounded-br-md"
                               }`}>
-                                {!msg.isOwner && (
-                                  <p className="font-body text-[10px] opacity-70 mb-0.5">{msg.name}</p>
-                                )}
+                                {!msg.isOwner && <p className="font-body text-[10px] opacity-70 mb-0.5">{msg.name}</p>}
                                 <p className={`font-body text-sm leading-relaxed ${msg.isOwner ? "text-secondary-foreground" : ""}`}>{msg.message}</p>
                                 <p className={`font-body text-[10px] mt-1 ${msg.isOwner ? "text-muted-foreground/40" : "opacity-50"}`}>
                                   {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
@@ -600,7 +710,6 @@ const Home = () => {
                           <div ref={chatEndRef} />
                         </div>
 
-                        {/* Name banner (collapsible) */}
                         <AnimatePresence>
                           {showNameInput && (
                             <motion.div
@@ -620,7 +729,6 @@ const Home = () => {
                           )}
                         </AnimatePresence>
 
-                        {/* Input bar - iMessage style */}
                         <div className="border-t border-border/40 p-3 bg-card/50 flex items-center gap-2">
                           <button
                             onClick={() => setShowNameInput(!showNameInput)}
@@ -653,8 +761,8 @@ const Home = () => {
                         </div>
                       </div>
                     </motion.div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </ResizablePanel>
