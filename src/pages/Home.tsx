@@ -66,10 +66,10 @@ const Home = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-background dark">
-      {/* Subtle background */}
+    <div className="relative min-h-screen bg-background">
+      {/* NYC cityscape background on right side */}
       <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
+        className="fixed right-0 bottom-0 w-2/3 h-full bg-contain bg-right-bottom bg-no-repeat opacity-[0.07] pointer-events-none"
         style={{ backgroundImage: `url(${cityscape})` }}
       />
 
