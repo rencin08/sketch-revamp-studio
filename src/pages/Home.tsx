@@ -6,10 +6,11 @@ import {
   Briefcase, PanelLeftClose, PanelLeftOpen, Plus, StickyNote,
   Archive, X, ChevronDown, ChevronUp, Camera, Calendar, Send, MessageCircle,
   Hash, Share2, Check, Square, CheckSquare, ShoppingCart, Lightbulb,
-  ListTodo, BookMarked, Utensils, Target, Pen
+  ListTodo, BookMarked, Utensils, Target, Pen, Menu
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // --- Constants ---
 
@@ -164,18 +165,16 @@ const savePins = (pins: PinItem[]) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
   } catch (e) {
-    // Quota exceeded — drop photo data from oldest archived pins to free space
     console.warn("localStorage quota exceeded, pruning photo data...");
     const pruned = pins.map((p) => {
       if (p.type === "photo" && p.archived) {
-        return { ...p, content: "" }; // remove base64 from old archived photos
+        return { ...p, content: "" };
       }
       return p;
     });
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
     } catch {
-      // Still too big — drop all photo content
       const aggressive = pruned.filter((p) => p.type !== "photo" || !p.archived);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(aggressive));
@@ -198,7 +197,6 @@ const getGreeting = () => {
   return "good evening";
 };
 
-// Parse ☐ / ☑ lines into checklist
 const parseChecklist = (content: string): { text: string; checked: boolean }[] | undefined => {
   const lines = content.split("\n");
   const checkItems = lines.filter((l) => l.startsWith("☐ ") || l.startsWith("☑ "));
@@ -212,7 +210,9 @@ const parseChecklist = (content: string): { text: string; checked: boolean }[] |
 // --- Component ---
 
 const Home = () => {
+  const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pins, setPins] = useState<PinItem[]>(loadPins);
   const [showArchive, setShowArchive] = useState(false);
   const [noteContent, setNoteContent] = useState("");
@@ -269,13 +269,11 @@ const Home = () => {
       : [...selectedTags, tagKey];
     setSelectedTags(newTags);
 
-    // If selecting a tag with a template and textarea is empty, fill it
     if (!wasSelected && TAGS[tagKey]?.template && !noteContent.trim()) {
       setNoteContent(TAGS[tagKey].template!);
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus();
-          // Place cursor at first empty spot
           const pos = TAGS[tagKey].template!.indexOf(": ") + 2 || TAGS[tagKey].template!.indexOf("☐ ") + 2;
           if (pos > 1) {
             textareaRef.current.setSelectionRange(pos, pos);
@@ -318,7 +316,6 @@ const Home = () => {
       const newChecklist = p.checklist.map((item, i) =>
         i === idx ? { ...item, checked: !item.checked } : item
       );
-      // Also update the content string
       const lines = p.content.split("\n");
       let checkIdx = 0;
       const newLines = lines.map((line) => {
@@ -363,7 +360,6 @@ const Home = () => {
     { id: "messages" as const, label: "Messages", icon: MessageCircle },
   ];
 
-  // Determine widget size: "small" for short notes, "medium" for checklists, "large" for photos/long content
   const getWidgetSize = (pin: PinItem): "small" | "medium" | "large" => {
     if (pin.type === "photo") return "large";
     if (pin.checklist && pin.checklist.length > 0) return "medium";
@@ -371,7 +367,6 @@ const Home = () => {
     return "small";
   };
 
-  // Group pins by their primary tag
   const groupPinsByTag = (pinsList: PinItem[]) => {
     const groups: Record<string, PinItem[]> = {};
     const ungrouped: PinItem[] = [];
@@ -406,7 +401,7 @@ const Home = () => {
         exit={{ opacity: 0, scale: 0.95 }}
         className={`rounded-2xl border border-border bg-card overflow-hidden group relative transition-all hover:shadow-md ${
           isArchived ? "opacity-60 hover:opacity-100" : ""
-        } ${size === "large" ? "col-span-2" : size === "medium" ? "col-span-2 sm:col-span-1" : ""}`}
+        } ${size === "large" ? "col-span-2" : size === "medium" && !isMobile ? "col-span-2 sm:col-span-1" : ""}`}
       >
         {/* Hover actions */}
         <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -435,21 +430,18 @@ const Home = () => {
           </div>
         ) : hasChecklist ? (
           <div className="p-3.5">
-            {/* Header with icon */}
             <div className="flex items-center gap-2 mb-2">
               {TagIcon && <TagIcon size={13} className="text-accent/60" />}
               {pin.content.split("\n").filter((l) => !l.startsWith("☐ ") && !l.startsWith("☑ ") && l.trim()).slice(0, 1).map((line, i) => (
                 <p key={i} className="font-body text-xs font-medium text-foreground/80 truncate">{line}</p>
               ))}
             </div>
-            {/* Mini progress */}
             <div className="flex items-center gap-2 mb-2">
               <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
                 <motion.div className="h-full rounded-full bg-accent/50" animate={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }} />
               </div>
               <span className="font-body text-[9px] text-muted-foreground/50">{completedCount}/{totalCount}</span>
             </div>
-            {/* Compact checklist - show max 4 items */}
             <div className="space-y-1">
               {pin.checklist!.slice(0, 4).map((ci, idx) => (
                 <button key={idx} onClick={() => !isArchived && toggleCheckItem(pin.id, idx)} className="flex items-center gap-2 w-full text-left group/item">
@@ -486,7 +478,7 @@ const Home = () => {
           <span className="font-body text-[11px] tracking-widest text-muted-foreground/50 uppercase">{config?.label || tagKey}</span>
           <span className="font-body text-[10px] text-muted-foreground/30">{groupPins.length}</span>
         </div>
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className={`grid gap-2.5 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
           <AnimatePresence>
             {groupPins.map((pin) => renderWidget(pin, isArchived))}
           </AnimatePresence>
@@ -494,6 +486,384 @@ const Home = () => {
       </div>
     );
   };
+
+  // --- Extracted render helpers for layout ---
+
+  const renderSidebarContent = () => (
+    <motion.div variants={container} initial="hidden" animate="show" className="flex flex-col gap-3">
+      {/* Hero Card */}
+      <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-5 overflow-hidden">
+        <MacDots />
+        <div className="flex items-start gap-4 mb-3">
+          <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-accent/40 shrink-0">
+            <img src={avatar} alt="Cindy" className="w-full h-full object-cover" />
+          </div>
+          <div className="pt-1">
+            <h1 className="font-display italic text-2xl text-foreground leading-tight">hi, i'm cindy.</h1>
+          </div>
+        </div>
+        <p className="font-body text-sm text-muted-foreground leading-relaxed mb-4">
+          23-year-old startup founder in NYC. Harvard grad who left finance to build things that matter.
+        </p>
+        <div className="flex gap-2 flex-wrap">
+          {socialLinks.map(({ icon: Icon, href, label }) => (
+            <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-background/50 text-xs font-body text-foreground/70 hover:text-foreground hover:border-accent/40 transition-colors">
+              <Icon size={13} /> {label}
+            </a>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Thoughts Card */}
+      <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-5 cursor-pointer hover:border-accent/30 transition-colors group">
+        <MacDots />
+        <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center mb-3">
+          <BookOpen size={18} className="text-secondary-foreground" />
+        </div>
+        <p className="font-body text-xs tracking-widest text-accent uppercase mb-1">Thoughts & Reflections</p>
+        <h3 className="font-display text-lg text-foreground mb-1">Essays on growing up</h3>
+        <p className="font-body text-sm text-muted-foreground">Leaving finance, building startups, and figuring out life in your 20s.</p>
+        <ArrowRight size={14} className="text-accent mt-3 group-hover:translate-x-1 transition-transform" />
+      </motion.div>
+
+      {/* Quote Card */}
+      <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-5 text-center">
+        <MacDots />
+        <p className="font-display italic text-lg text-accent leading-snug mt-2">"Build the life you want to live."</p>
+        <span className="font-body text-xs tracking-widest text-muted-foreground mt-2 uppercase block">daily mantra</span>
+      </motion.div>
+
+      {/* Small widgets */}
+      <div className="grid grid-cols-2 gap-3">
+        <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-accent/30 transition-colors">
+          <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center mb-2">
+            <Sparkles size={16} className="text-primary" />
+          </div>
+          <h3 className="font-display text-sm text-foreground">AI Hub</h3>
+          <p className="font-body text-xs text-muted-foreground mt-0.5">Learning notes</p>
+        </motion.div>
+        <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-accent/30 transition-colors">
+          <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center mb-2">
+            <Briefcase size={16} className="text-accent" />
+          </div>
+          <h3 className="font-display text-sm text-foreground">Projects</h3>
+          <p className="font-body text-xs text-muted-foreground mt-0.5">What I'm building</p>
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+
+  const renderToolbar = () => (
+    <div className="px-4 md:px-10 pt-4 md:pt-6 pb-2 flex items-center justify-between shrink-0">
+      <div className="flex items-center gap-2 md:gap-3">
+        {isMobile ? (
+          <button onClick={() => setMobileSidebarOpen(true)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors">
+            <Menu size={18} />
+          </button>
+        ) : (
+          <button onClick={() => setCollapsed(!collapsed)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors">
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+        )}
+        <div className="flex items-center gap-0.5 md:gap-1 bg-card/60 rounded-xl p-1 border border-border">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded-lg font-body text-xs transition-all ${
+                activeTab === tab.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <tab.icon size={13} />
+              <span className={isMobile && tab.id !== activeTab ? "hidden" : ""}>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 md:gap-3">
+        <button onClick={shareLink} className="flex items-center gap-1.5 px-2 md:px-3 py-1.5 rounded-lg font-body text-xs text-muted-foreground hover:text-foreground hover:bg-card transition-colors">
+          <Share2 size={13} /> <span className="hidden md:inline">Share</span>
+        </button>
+        <p className="font-body text-xs tracking-widest text-muted-foreground uppercase hidden lg:block">{formattedDate}</p>
+      </div>
+    </div>
+  );
+
+  const renderTabContent = () => (
+    <>
+      {/* ============ TODAY TAB ============ */}
+      {activeTab === "today" && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="today">
+          {/* NYC Cityscape Hero */}
+          <div className="relative overflow-hidden" style={{ minHeight: isMobile ? 120 : 160 }}>
+            <div
+              className="absolute inset-0 bg-contain bg-bottom bg-no-repeat opacity-[0.08]"
+              style={{ backgroundImage: `url(${cityscape})` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-background/0 via-background/30 to-background" />
+            <div className={`relative mx-auto px-4 md:px-10 pt-4 pb-4 ${isMobile ? "" : "max-w-2xl"}`}>
+              <motion.p className="font-body text-sm text-muted-foreground/60 mb-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+                {getGreeting()} ☀️
+              </motion.p>
+              <h1 className={`font-display italic text-foreground mb-3 mt-1 ${isMobile ? "text-3xl" : "text-4xl md:text-5xl"}`}>Today</h1>
+              <WritingAvatar />
+            </div>
+          </div>
+
+          {/* Single-column feed */}
+          <div className={`mx-auto px-4 md:px-10 ${isMobile ? "" : "max-w-2xl"}`}>
+            {/* Writing area */}
+            <div className="relative mb-5 -mt-2">
+              <div className="rounded-2xl border border-border/60 bg-card/40 p-4 md:p-5 focus-within:border-accent/30 focus-within:bg-card/60 transition-all shadow-sm">
+                <textarea
+                  ref={textareaRef}
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  placeholder="what's on your mind? pick a tag below to get started with a template ✏️"
+                  className={`w-full bg-transparent font-body text-foreground/90 leading-relaxed resize-none outline-none placeholder:text-muted-foreground/35 ${isMobile ? "text-base min-h-[80px]" : "text-base md:text-lg min-h-[100px]"}`}
+                  onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) saveNote(); }}
+                />
+
+                {/* Selected tags */}
+                {selectedTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {selectedTags.map((tag) => {
+                      const config = TAGS[tag];
+                      const Icon = config?.icon;
+                      return (
+                        <button key={tag} onClick={() => selectTag(tag)}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${config?.color || "bg-muted text-muted-foreground"}`}>
+                          {Icon && <Icon size={10} />} #{tag} <X size={10} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between mt-2 pt-3 border-t border-border/30">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/50 hover:bg-accent/10 hover:border-accent/30 font-body text-xs text-muted-foreground hover:text-foreground transition-all">
+                      <Camera size={13} /> Photo
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={addPhoto} />
+                  </div>
+                  <AnimatePresence>
+                    {noteContent.trim() && (
+                      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="flex items-center gap-2">
+                        {!isMobile && <span className="font-body text-xs text-muted-foreground/40">⌘ + Enter</span>}
+                        <button onClick={saveNote} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-accent-foreground font-body text-xs hover:bg-accent/90 transition-colors">
+                          <Plus size={12} /> Pin it
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              {/* Tag shortcuts */}
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {Object.entries(TAGS).map(([key, config]) => {
+                  const Icon = config.icon;
+                  const isSelected = selectedTags.includes(key);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => selectTag(key)}
+                      className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-xl font-body text-xs transition-all ${
+                        isSelected
+                          ? `${config.color} ring-1 ring-accent/20 shadow-sm`
+                          : "bg-card/60 text-muted-foreground hover:text-foreground border border-border/40 hover:border-accent/30"
+                      }`}
+                    >
+                      <Icon size={12} />
+                      {config.label}
+                      {config.template && !isSelected && (
+                        <span className="text-[9px] opacity-40 ml-0.5">✦</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {activePins.length > 0 && (() => {
+              const { groups, ungrouped } = groupPinsByTag(activePins);
+              return (
+                <div className="mb-6">
+                  {Object.entries(groups).map(([tagKey, groupPins]) =>
+                    renderTagGroup(tagKey, groupPins)
+                  )}
+                  {ungrouped.length > 0 && (
+                    <div className="mb-5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <StickyNote size={13} className="text-muted-foreground/50" />
+                        <span className="font-body text-[11px] tracking-widest text-muted-foreground/50 uppercase">Notes</span>
+                        <span className="font-body text-[10px] text-muted-foreground/30">{ungrouped.length}</span>
+                      </div>
+                      <div className={`grid gap-2.5 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+                        <AnimatePresence>
+                          {ungrouped.map((pin) => renderWidget(pin))}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Empty state */}
+            {activePins.length === 0 && (
+              <motion.div className="text-center py-10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
+                <motion.div animate={{ y: [0, -5, 0] }} transition={{ duration: 3, repeat: Infinity }}>
+                  <StickyNote size={28} className="text-accent/20 mx-auto mb-3" />
+                </motion.div>
+                <p className="font-body text-sm text-muted-foreground/40">pick a tag above to get started with a template</p>
+                <p className="font-body text-xs text-muted-foreground/25 mt-1">or just start typing — anything goes</p>
+              </motion.div>
+            )}
+
+            {/* Archive */}
+            {archivedPins.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-border/50 pb-8">
+                <button onClick={() => setShowArchive(!showArchive)}
+                  className="flex items-center gap-2 font-body text-xs tracking-widest text-muted-foreground uppercase hover:text-foreground transition-colors w-full">
+                  <Archive size={14} /> Archive ({archivedPins.length})
+                  {showArchive ? <ChevronUp size={14} className="ml-auto" /> : <ChevronDown size={14} className="ml-auto" />}
+                </button>
+                <AnimatePresence>
+                  {showArchive && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                      {archiveTags.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-4 mb-3">
+                          <button onClick={() => setArchiveFilter(null)}
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${!archiveFilter ? "bg-accent/15 text-accent" : "bg-muted/50 text-muted-foreground hover:bg-muted"}`}>
+                            All
+                          </button>
+                          {archiveTags.map((tag) => (
+                            <button key={tag} onClick={() => setArchiveFilter(archiveFilter === tag ? null : tag)}
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${
+                                archiveFilter === tag ? `${TAGS[tag]?.color || "bg-muted text-muted-foreground"} ring-1 ring-accent/30` : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                              }`}>
+                              #{tag}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {(() => {
+                        const { groups, ungrouped } = groupPinsByTag(filteredArchive);
+                        return (
+                          <>
+                            {Object.entries(groups).map(([tagKey, groupPins]) =>
+                              renderTagGroup(tagKey, groupPins, true)
+                            )}
+                            {ungrouped.length > 0 && (
+                              <div className={`grid gap-2.5 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+                                {ungrouped.map((pin) => renderWidget(pin, true))}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ============ CALENDAR TAB ============ */}
+      {activeTab === "calendar" && (
+        <div className={`mx-auto px-4 md:px-10 py-4 ${isMobile ? "" : "max-w-3xl"}`}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="calendar">
+            <h1 className={`font-display italic text-foreground mb-4 mt-4 ${isMobile ? "text-3xl" : "text-4xl md:text-5xl"}`}>Let's Meet</h1>
+            <div className="w-full h-px bg-border mb-6" />
+            <p className="font-body text-base text-muted-foreground mb-6">Want to chat? Pick a time that works for you.</p>
+            <div className="rounded-2xl border border-border bg-card overflow-hidden" style={{ minHeight: isMobile ? 500 : 600 }}>
+              <iframe src="https://calendly.com/ccindyren" width="100%" height={isMobile ? "500" : "650"} frameBorder="0" className="w-full" title="Schedule a meeting" />
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ============ MESSAGES TAB ============ */}
+      {activeTab === "messages" && (
+        <div className={`mx-auto px-4 md:px-10 py-4 ${isMobile ? "" : "max-w-3xl"}`}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="messages" className="flex flex-col" style={{ minHeight: isMobile ? "calc(100vh - 120px)" : "calc(100vh - 140px)" }}>
+            <div className="mb-4">
+              <h1 className={`font-display italic text-foreground mt-4 ${isMobile ? "text-3xl" : "text-4xl md:text-5xl"}`}>Messages</h1>
+              <p className="font-body text-sm text-muted-foreground mt-2">send me a message — feedback, ideas, or just say hi 💬</p>
+            </div>
+
+            <div className="flex-1 rounded-2xl border border-border bg-card/30 overflow-hidden flex flex-col">
+              <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 min-h-[250px] md:min-h-[300px]">
+                <div className={`flex items-end gap-2 ${isMobile ? "max-w-[85%]" : "max-w-[75%]"}`}>
+                  <div className="w-7 h-7 rounded-full overflow-hidden border border-accent/30 shrink-0">
+                    <img src={avatar} alt="Cindy" className="w-full h-full object-cover" />
+                  </div>
+                  <motion.div className="bg-secondary rounded-2xl rounded-bl-md px-4 py-2.5" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+                    <p className="font-body text-sm text-secondary-foreground">hey! thanks for stopping by 🤗 leave me a message — i'd love to hear your thoughts on the site, or anything really!</p>
+                  </motion.div>
+                </div>
+
+                {chatMessages.map((msg) => (
+                  <motion.div key={msg.id} initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.2 }}
+                    className={`flex items-end gap-2 ${msg.isOwner ? `${isMobile ? "max-w-[85%]" : "max-w-[75%]"}` : `${isMobile ? "max-w-[85%]" : "max-w-[75%]"} ml-auto flex-row-reverse`}`}>
+                    {msg.isOwner ? (
+                      <div className="w-7 h-7 rounded-full overflow-hidden border border-accent/30 shrink-0">
+                        <img src={avatar} alt="Cindy" className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-accent/15 flex items-center justify-center shrink-0">
+                        <span className="font-display text-[10px] text-accent">{msg.name[0].toUpperCase()}</span>
+                      </div>
+                    )}
+                    <div className={`rounded-2xl px-4 py-2.5 ${msg.isOwner ? "bg-secondary rounded-bl-md" : "bg-accent text-accent-foreground rounded-br-md"}`}>
+                      {!msg.isOwner && <p className="font-body text-[10px] opacity-70 mb-0.5">{msg.name}</p>}
+                      <p className={`font-body text-sm leading-relaxed ${msg.isOwner ? "text-secondary-foreground" : ""}`}>{msg.message}</p>
+                      <p className={`font-body text-[10px] mt-1 ${msg.isOwner ? "text-muted-foreground/40" : "opacity-50"}`}>
+                        {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              <AnimatePresence>
+                {showNameInput && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                    className="border-t border-border/30 px-4 py-2 bg-card/50 overflow-hidden">
+                    <input type="text" value={chatName} onChange={(e) => setChatName(e.target.value)} placeholder="Your name (optional)"
+                      className="w-full bg-transparent font-body text-xs text-foreground/70 outline-none placeholder:text-muted-foreground/40" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="border-t border-border/40 p-3 bg-card/50 flex items-center gap-2">
+                <button onClick={() => setShowNameInput(!showNameInput)}
+                  className={`p-2 rounded-full transition-colors ${showNameInput ? "bg-accent/15 text-accent" : "text-muted-foreground/40 hover:text-muted-foreground"}`} title="Set your name">
+                  <span className="font-display text-xs">{chatName ? chatName[0].toUpperCase() : "?"}</span>
+                </button>
+                <div className="flex-1 flex items-center bg-background rounded-full border border-border/50 px-4 py-2">
+                  <input ref={chatInputRef} type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="iMessage"
+                    className="flex-1 bg-transparent font-body text-sm text-foreground outline-none placeholder:text-muted-foreground/30"
+                    onKeyDown={(e) => { if (e.key === "Enter") sendChatMessage(); }} />
+                </div>
+                <motion.button onClick={sendChatMessage} disabled={!chatInput.trim()}
+                  className="p-2 rounded-full bg-accent text-accent-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all" whileTap={{ scale: 0.9 }}>
+                  <Send size={14} />
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div className="relative min-h-screen bg-background">
@@ -512,393 +882,71 @@ const Home = () => {
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 h-screen">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
-          {/* LEFT PANEL */}
-          {!collapsed && (
+      {/* Mobile sidebar overlay */}
+      {isMobile && (
+        <AnimatePresence>
+          {mobileSidebarOpen && (
             <>
-              <ResizablePanel defaultSize={28} minSize={20} maxSize={40}>
-                <div className="h-full border-r border-border bg-card/40 backdrop-blur-sm overflow-y-auto p-4">
-                  <div className="mb-5">
-                    <h2 className="font-display italic text-xl text-foreground/70">cindy's world</h2>
-                  </div>
-
-                  <motion.div variants={container} initial="hidden" animate="show" className="flex flex-col gap-3">
-                    {/* Hero Card */}
-                    <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-5 overflow-hidden">
-                      <MacDots />
-                      <div className="flex items-start gap-4 mb-3">
-                        <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-accent/40 shrink-0">
-                          <img src={avatar} alt="Cindy" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="pt-1">
-                          <h1 className="font-display italic text-2xl text-foreground leading-tight">hi, i'm cindy.</h1>
-                        </div>
-                      </div>
-                      <p className="font-body text-sm text-muted-foreground leading-relaxed mb-4">
-                        23-year-old startup founder in NYC. Harvard grad who left finance to build things that matter.
-                      </p>
-                      <div className="flex gap-2">
-                        {socialLinks.map(({ icon: Icon, href, label }) => (
-                          <a key={label} href={href} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-background/50 text-xs font-body text-foreground/70 hover:text-foreground hover:border-accent/40 transition-colors">
-                            <Icon size={13} /> {label}
-                          </a>
-                        ))}
-                      </div>
-                    </motion.div>
-
-                    {/* Thoughts Card */}
-                    <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-5 cursor-pointer hover:border-accent/30 transition-colors group">
-                      <MacDots />
-                      <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center mb-3">
-                        <BookOpen size={18} className="text-secondary-foreground" />
-                      </div>
-                      <p className="font-body text-xs tracking-widest text-accent uppercase mb-1">Thoughts & Reflections</p>
-                      <h3 className="font-display text-lg text-foreground mb-1">Essays on growing up</h3>
-                      <p className="font-body text-sm text-muted-foreground">Leaving finance, building startups, and figuring out life in your 20s.</p>
-                      <ArrowRight size={14} className="text-accent mt-3 group-hover:translate-x-1 transition-transform" />
-                    </motion.div>
-
-                    {/* Quote Card */}
-                    <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-5 text-center">
-                      <MacDots />
-                      <p className="font-display italic text-lg text-accent leading-snug mt-2">"Build the life you want to live."</p>
-                      <span className="font-body text-xs tracking-widest text-muted-foreground mt-2 uppercase block">daily mantra</span>
-                    </motion.div>
-
-                    {/* Small widgets */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-accent/30 transition-colors">
-                        <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center mb-2">
-                          <Sparkles size={16} className="text-primary" />
-                        </div>
-                        <h3 className="font-display text-sm text-foreground">AI Hub</h3>
-                        <p className="font-body text-xs text-muted-foreground mt-0.5">Learning notes</p>
-                      </motion.div>
-                      <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-accent/30 transition-colors">
-                        <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center mb-2">
-                          <Briefcase size={16} className="text-accent" />
-                        </div>
-                        <h3 className="font-display text-sm text-foreground">Projects</h3>
-                        <p className="font-body text-xs text-muted-foreground mt-0.5">What I'm building</p>
-                      </motion.div>
-                    </div>
-                  </motion.div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40"
+                onClick={() => setMobileSidebarOpen(false)}
+              />
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-50 bg-card border-r border-border overflow-y-auto p-4"
+              >
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="font-display italic text-xl text-foreground/70">cindy's world</h2>
+                  <button onClick={() => setMobileSidebarOpen(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground">
+                    <X size={18} />
+                  </button>
                 </div>
-              </ResizablePanel>
-              <ResizableHandle withHandle />
+                {renderSidebarContent()}
+              </motion.div>
             </>
           )}
+        </AnimatePresence>
+      )}
 
-          {/* RIGHT PANEL */}
-          <ResizablePanel defaultSize={collapsed ? 100 : 72}>
-            <div className="h-full overflow-hidden bg-background flex flex-col">
-              {/* Toolbar */}
-              <div className="px-6 md:px-10 pt-6 pb-2 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setCollapsed(!collapsed)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors">
-                    {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-                  </button>
-                  <div className="flex items-center gap-1 bg-card/60 rounded-xl p-1 border border-border">
-                    {tabs.map((tab) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs transition-all ${
-                          activeTab === tab.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <tab.icon size={13} />
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={shareLink} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs text-muted-foreground hover:text-foreground hover:bg-card transition-colors">
-                    <Share2 size={13} /> Share
-                  </button>
-                  <p className="font-body text-xs tracking-widest text-muted-foreground uppercase hidden md:block">{formattedDate}</p>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto">
-                {/* ============ TODAY TAB ============ */}
-                {activeTab === "today" && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="today">
-                    {/* NYC Cityscape Hero */}
-                    <div className="relative overflow-hidden" style={{ minHeight: 160 }}>
-                      <div
-                        className="absolute inset-0 bg-contain bg-bottom bg-no-repeat opacity-[0.08]"
-                        style={{ backgroundImage: `url(${cityscape})` }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-b from-background/0 via-background/30 to-background" />
-                      <div className="relative max-w-2xl mx-auto px-6 md:px-10 pt-4 pb-4">
-                        <motion.p className="font-body text-sm text-muted-foreground/60 mb-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-                          {getGreeting()} ☀️
-                        </motion.p>
-                        <h1 className="font-display italic text-4xl md:text-5xl text-foreground mb-3 mt-1">Today</h1>
-                        <WritingAvatar />
-                      </div>
-                    </div>
-
-                    {/* Single-column feed */}
-                    <div className="max-w-2xl mx-auto px-6 md:px-10">
-                      {/* Writing area */}
-                      <div className="relative mb-5 -mt-2">
-                        <div className="rounded-2xl border border-border/60 bg-card/40 p-5 focus-within:border-accent/30 focus-within:bg-card/60 transition-all shadow-sm">
-                          <textarea
-                            ref={textareaRef}
-                            value={noteContent}
-                            onChange={(e) => setNoteContent(e.target.value)}
-                            placeholder="what's on your mind? pick a tag below to get started with a template ✏️"
-                            className="w-full bg-transparent font-body text-base md:text-lg text-foreground/90 leading-relaxed resize-none outline-none placeholder:text-muted-foreground/35 min-h-[100px]"
-                            onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) saveNote(); }}
-                          />
-
-                          {/* Selected tags */}
-                          {selectedTags.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mb-2">
-                              {selectedTags.map((tag) => {
-                                const config = TAGS[tag];
-                                const Icon = config?.icon;
-                                return (
-                                  <button key={tag} onClick={() => selectTag(tag)}
-                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${config?.color || "bg-muted text-muted-foreground"}`}>
-                                    {Icon && <Icon size={10} />} #{tag} <X size={10} />
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between mt-2 pt-3 border-t border-border/30">
-                            <div className="flex items-center gap-2">
-                              <button onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/50 hover:bg-accent/10 hover:border-accent/30 font-body text-xs text-muted-foreground hover:text-foreground transition-all">
-                                <Camera size={13} /> Photo
-                              </button>
-                              <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={addPhoto} />
-                            </div>
-                            <AnimatePresence>
-                              {noteContent.trim() && (
-                                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="flex items-center gap-2">
-                                  <span className="font-body text-xs text-muted-foreground/40">⌘ + Enter</span>
-                                  <button onClick={saveNote} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-accent-foreground font-body text-xs hover:bg-accent/90 transition-colors">
-                                    <Plus size={12} /> Pin it
-                                  </button>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        </div>
-
-                        {/* Tag shortcuts with templates */}
-                        <div className="flex flex-wrap gap-1.5 mt-3">
-                          {Object.entries(TAGS).map(([key, config]) => {
-                            const Icon = config.icon;
-                            const isSelected = selectedTags.includes(key);
-                            return (
-                              <button
-                                key={key}
-                                onClick={() => selectTag(key)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-body text-xs transition-all ${
-                                  isSelected
-                                    ? `${config.color} ring-1 ring-accent/20 shadow-sm`
-                                    : "bg-card/60 text-muted-foreground hover:text-foreground border border-border/40 hover:border-accent/30"
-                                }`}
-                              >
-                                <Icon size={12} />
-                                {config.label}
-                                {config.template && !isSelected && (
-                                  <span className="text-[9px] opacity-40 ml-0.5">✦</span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {activePins.length > 0 && (() => {
-                        const { groups, ungrouped } = groupPinsByTag(activePins);
-                        return (
-                          <div className="mb-6">
-                            {Object.entries(groups).map(([tagKey, groupPins]) =>
-                              renderTagGroup(tagKey, groupPins)
-                            )}
-                            {ungrouped.length > 0 && (
-                              <div className="mb-5">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <StickyNote size={13} className="text-muted-foreground/50" />
-                                  <span className="font-body text-[11px] tracking-widest text-muted-foreground/50 uppercase">Notes</span>
-                                  <span className="font-body text-[10px] text-muted-foreground/30">{ungrouped.length}</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2.5">
-                                  <AnimatePresence>
-                                    {ungrouped.map((pin) => renderWidget(pin))}
-                                  </AnimatePresence>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      {/* Empty state */}
-                      {activePins.length === 0 && (
-                        <motion.div className="text-center py-10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
-                          <motion.div animate={{ y: [0, -5, 0] }} transition={{ duration: 3, repeat: Infinity }}>
-                            <StickyNote size={28} className="text-accent/20 mx-auto mb-3" />
-                          </motion.div>
-                          <p className="font-body text-sm text-muted-foreground/40">pick a tag above to get started with a template</p>
-                          <p className="font-body text-xs text-muted-foreground/25 mt-1">or just start typing — anything goes</p>
-                        </motion.div>
-                      )}
-
-                      {/* Archive */}
-                      {archivedPins.length > 0 && (
-                        <div className="mt-6 pt-4 border-t border-border/50 pb-8">
-                          <button onClick={() => setShowArchive(!showArchive)}
-                            className="flex items-center gap-2 font-body text-xs tracking-widest text-muted-foreground uppercase hover:text-foreground transition-colors w-full">
-                            <Archive size={14} /> Archive ({archivedPins.length})
-                            {showArchive ? <ChevronUp size={14} className="ml-auto" /> : <ChevronDown size={14} className="ml-auto" />}
-                          </button>
-                          <AnimatePresence>
-                            {showArchive && (
-                              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                                {archiveTags.length > 0 && (
-                                  <div className="flex flex-wrap items-center gap-1.5 mt-4 mb-3">
-                                    <button onClick={() => setArchiveFilter(null)}
-                                      className={`px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${!archiveFilter ? "bg-accent/15 text-accent" : "bg-muted/50 text-muted-foreground hover:bg-muted"}`}>
-                                      All
-                                    </button>
-                                    {archiveTags.map((tag) => (
-                                      <button key={tag} onClick={() => setArchiveFilter(archiveFilter === tag ? null : tag)}
-                                        className={`px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${
-                                          archiveFilter === tag ? `${TAGS[tag]?.color || "bg-muted text-muted-foreground"} ring-1 ring-accent/30` : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                                        }`}>
-                                        #{tag}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                                {(() => {
-                                  const { groups, ungrouped } = groupPinsByTag(filteredArchive);
-                                  return (
-                                    <>
-                                      {Object.entries(groups).map(([tagKey, groupPins]) =>
-                                        renderTagGroup(tagKey, groupPins, true)
-                                      )}
-                                      {ungrouped.length > 0 && (
-                                        <div className="grid grid-cols-2 gap-2.5">
-                                          {ungrouped.map((pin) => renderWidget(pin, true))}
-                                        </div>
-                                      )}
-                                    </>
-                                  );
-                                })()}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* ============ CALENDAR TAB ============ */}
-                {activeTab === "calendar" && (
-                  <div className="max-w-3xl mx-auto px-6 md:px-10 py-4">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="calendar">
-                      <h1 className="font-display italic text-4xl md:text-5xl text-foreground mb-4 mt-4">Let's Meet</h1>
-                      <div className="w-full h-px bg-border mb-6" />
-                      <p className="font-body text-base text-muted-foreground mb-6">Want to chat? Pick a time that works for you.</p>
-                      <div className="rounded-2xl border border-border bg-card overflow-hidden" style={{ minHeight: 600 }}>
-                        <iframe src="https://calendly.com/ccindyren" width="100%" height="650" frameBorder="0" className="w-full" title="Schedule a meeting" />
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-
-                {/* ============ MESSAGES TAB ============ */}
-                {activeTab === "messages" && (
-                  <div className="max-w-3xl mx-auto px-6 md:px-10 py-4">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="messages" className="flex flex-col" style={{ minHeight: "calc(100vh - 140px)" }}>
-                      <div className="mb-4">
-                        <h1 className="font-display italic text-4xl md:text-5xl text-foreground mt-4">Messages</h1>
-                        <p className="font-body text-sm text-muted-foreground mt-2">send me a message — feedback, ideas, or just say hi 💬</p>
-                      </div>
-
-                      <div className="flex-1 rounded-2xl border border-border bg-card/30 overflow-hidden flex flex-col">
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px]">
-                          <div className="flex items-end gap-2 max-w-[75%]">
-                            <div className="w-7 h-7 rounded-full overflow-hidden border border-accent/30 shrink-0">
-                              <img src={avatar} alt="Cindy" className="w-full h-full object-cover" />
-                            </div>
-                            <motion.div className="bg-secondary rounded-2xl rounded-bl-md px-4 py-2.5" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-                              <p className="font-body text-sm text-secondary-foreground">hey! thanks for stopping by 🤗 leave me a message — i'd love to hear your thoughts on the site, or anything really!</p>
-                            </motion.div>
-                          </div>
-
-                          {chatMessages.map((msg) => (
-                            <motion.div key={msg.id} initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.2 }}
-                              className={`flex items-end gap-2 ${msg.isOwner ? "max-w-[75%]" : "max-w-[75%] ml-auto flex-row-reverse"}`}>
-                              {msg.isOwner ? (
-                                <div className="w-7 h-7 rounded-full overflow-hidden border border-accent/30 shrink-0">
-                                  <img src={avatar} alt="Cindy" className="w-full h-full object-cover" />
-                                </div>
-                              ) : (
-                                <div className="w-7 h-7 rounded-full bg-accent/15 flex items-center justify-center shrink-0">
-                                  <span className="font-display text-[10px] text-accent">{msg.name[0].toUpperCase()}</span>
-                                </div>
-                              )}
-                              <div className={`rounded-2xl px-4 py-2.5 ${msg.isOwner ? "bg-secondary rounded-bl-md" : "bg-accent text-accent-foreground rounded-br-md"}`}>
-                                {!msg.isOwner && <p className="font-body text-[10px] opacity-70 mb-0.5">{msg.name}</p>}
-                                <p className={`font-body text-sm leading-relaxed ${msg.isOwner ? "text-secondary-foreground" : ""}`}>{msg.message}</p>
-                                <p className={`font-body text-[10px] mt-1 ${msg.isOwner ? "text-muted-foreground/40" : "opacity-50"}`}>
-                                  {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                                </p>
-                              </div>
-                            </motion.div>
-                          ))}
-                          <div ref={chatEndRef} />
-                        </div>
-
-                        <AnimatePresence>
-                          {showNameInput && (
-                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                              className="border-t border-border/30 px-4 py-2 bg-card/50 overflow-hidden">
-                              <input type="text" value={chatName} onChange={(e) => setChatName(e.target.value)} placeholder="Your name (optional)"
-                                className="w-full bg-transparent font-body text-xs text-foreground/70 outline-none placeholder:text-muted-foreground/40" />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-
-                        <div className="border-t border-border/40 p-3 bg-card/50 flex items-center gap-2">
-                          <button onClick={() => setShowNameInput(!showNameInput)}
-                            className={`p-2 rounded-full transition-colors ${showNameInput ? "bg-accent/15 text-accent" : "text-muted-foreground/40 hover:text-muted-foreground"}`} title="Set your name">
-                            <span className="font-display text-xs">{chatName ? chatName[0].toUpperCase() : "?"}</span>
-                          </button>
-                          <div className="flex-1 flex items-center bg-background rounded-full border border-border/50 px-4 py-2">
-                            <input ref={chatInputRef} type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="iMessage"
-                              className="flex-1 bg-transparent font-body text-sm text-foreground outline-none placeholder:text-muted-foreground/30"
-                              onKeyDown={(e) => { if (e.key === "Enter") sendChatMessage(); }} />
-                          </div>
-                          <motion.button onClick={sendChatMessage} disabled={!chatInput.trim()}
-                            className="p-2 rounded-full bg-accent text-accent-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all" whileTap={{ scale: 0.9 }}>
-                            <Send size={14} />
-                          </motion.button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-              </div>
+      <div className="relative z-10 h-screen">
+        {isMobile ? (
+          <div className="h-full overflow-hidden bg-background flex flex-col">
+            {renderToolbar()}
+            <div className="flex-1 overflow-y-auto">
+              {renderTabContent()}
             </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+        ) : (
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            {!collapsed && (
+              <>
+                <ResizablePanel defaultSize={28} minSize={20} maxSize={40}>
+                  <div className="h-full border-r border-border bg-card/40 backdrop-blur-sm overflow-y-auto p-4">
+                    <div className="mb-5">
+                      <h2 className="font-display italic text-xl text-foreground/70">cindy's world</h2>
+                    </div>
+                    {renderSidebarContent()}
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+              </>
+            )}
+            <ResizablePanel defaultSize={collapsed ? 100 : 72}>
+              <div className="h-full overflow-hidden bg-background flex flex-col">
+                {renderToolbar()}
+                <div className="flex-1 overflow-y-auto">
+                  {renderTabContent()}
+                </div>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
       </div>
     </div>
   );
