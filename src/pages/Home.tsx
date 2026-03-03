@@ -155,9 +155,36 @@ const loadPins = (): PinItem[] => {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
     return raw.map((p: any) => ({ ...p, tags: p.tags || [], checklist: p.checklist || undefined }));
-  } catch { return []; }
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+    return [];
+  }
 };
-const savePins = (pins: PinItem[]) => localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+const savePins = (pins: PinItem[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+  } catch (e) {
+    // Quota exceeded — drop photo data from oldest archived pins to free space
+    console.warn("localStorage quota exceeded, pruning photo data...");
+    const pruned = pins.map((p) => {
+      if (p.type === "photo" && p.archived) {
+        return { ...p, content: "" }; // remove base64 from old archived photos
+      }
+      return p;
+    });
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+    } catch {
+      // Still too big — drop all photo content
+      const aggressive = pruned.filter((p) => p.type !== "photo" || !p.archived);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(aggressive));
+      } catch {
+        // Give up silently
+      }
+    }
+  }
+};
 
 const loadChatMessages = (): ChatMessage[] => {
   try { return JSON.parse(localStorage.getItem(CHAT_KEY) || "[]"); } catch { return []; }
