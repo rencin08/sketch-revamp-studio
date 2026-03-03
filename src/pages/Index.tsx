@@ -54,7 +54,7 @@ const Index = () => {
         </motion.div>
 
         <TypingText
-          text="hi, i'm cindy"
+          text="welcome to cindy's home"
           className="font-display italic text-4xl md:text-6xl tracking-wide text-foreground"
           speed={90}
           delay={600}
