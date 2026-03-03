@@ -6,7 +6,8 @@ import {
   Briefcase, PanelLeftClose, PanelLeftOpen, Plus, StickyNote,
   Archive, X, ChevronDown, ChevronUp, Camera, Calendar, Send, MessageCircle,
   Hash, Share2, Check, Square, CheckSquare, ShoppingCart, Lightbulb,
-  ListTodo, BookMarked, Utensils, Target, Pen, Menu, Heart, Zap, Eye, EyeOff
+  ListTodo, BookMarked, Utensils, Target, Pen, Menu, Heart, Zap, Eye, EyeOff,
+  Search
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Globe, Lock } from "lucide-react";
@@ -585,38 +586,6 @@ const Home = () => {
         </motion.div>
       </div>
 
-      {/* Weekly Digest Card */}
-      <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-5 overflow-hidden">
-        <MacDots />
-        <div className="flex items-center gap-2 mb-3">
-          <Zap size={14} className="text-accent" />
-          <p className="font-body text-xs tracking-widest text-accent uppercase">This Week</p>
-        </div>
-        {(() => {
-          const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-          const weekPins = pins.filter(p => p.createdAt > weekAgo && !p.archived);
-          const weekMoods = weekPins.filter(p => p.type === "mood");
-          const weekNotes = weekPins.filter(p => p.type === "note" || p.type === "moment");
-          const weekPhotos = weekPins.filter(p => p.type === "photo");
-          return weekPins.length > 0 ? (
-            <div className="space-y-2">
-              <p className="font-display text-lg text-foreground">{weekPins.length} moments</p>
-              <div className="flex items-center gap-4 font-body text-xs text-muted-foreground">
-                {weekNotes.length > 0 && <span>{weekNotes.length} thoughts</span>}
-                {weekMoods.length > 0 && <span>{weekMoods.map(m => m.content).join("")}</span>}
-                {weekPhotos.length > 0 && <span>{weekPhotos.length} 📸</span>}
-              </div>
-              {weekNotes.length > 0 && (
-                <p className="font-body text-sm text-muted-foreground/60 italic mt-2 line-clamp-2">
-                  "{weekNotes[0].content.split("\n")[0]}"
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="font-body text-sm text-muted-foreground">Start capturing moments to see your weekly digest</p>
-          );
-        })()}
-      </motion.div>
     </motion.div>
   );
 
@@ -675,7 +644,7 @@ const Home = () => {
                 {/* Header: Today + Date */}
                 <div className="px-6 pt-2 pb-4">
                   <div className="flex items-baseline justify-between mb-3">
-                    <h1 className="font-display text-4xl text-foreground">Today</h1>
+                    <h1 className="font-display text-4xl text-foreground">{viewMode === "public" ? "Storyboard" : "Today"}</h1>
                     <p className="font-body text-sm text-foreground/60">
                       {today.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </p>
@@ -721,8 +690,26 @@ const Home = () => {
                   </div>
                 </div>
 
-                {/* Quick capture input */}
-                {!showArchive && (
+                {/* Search bar for mobile public/storyboard mode */}
+                {viewMode === "public" && (
+                  <div className="px-6 mb-4">
+                    <div className="rounded-2xl border border-border/60 bg-card/60 p-3.5 flex items-center gap-3 shadow-sm">
+                      <Search size={16} className="text-muted-foreground shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="ask me anything…"
+                        className="flex-1 bg-transparent font-body text-sm text-foreground outline-none placeholder:text-muted-foreground/50"
+                      />
+                      <button className="px-3 py-1.5 rounded-xl bg-foreground text-background font-body text-xs font-medium">
+                        Ask
+                      </button>
+                    </div>
+                    <p className="font-body text-[10px] text-muted-foreground/50 mt-1.5 text-center">powered by cindy's brain ✨</p>
+                  </div>
+                )}
+
+                {/* Quick capture input - private only */}
+                {!showArchive && viewMode === "private" && (
                   <div className="px-6 mb-4">
                     <div className="rounded-2xl border-2 border-border bg-card p-4">
                       <textarea 
@@ -877,7 +864,7 @@ const Home = () => {
                     {getGreeting()} ☀️
                   </motion.p>
                   <div className="flex items-center justify-between mb-3 mt-1">
-                    <h1 className="font-display italic text-4xl md:text-5xl text-foreground">Today</h1>
+                    <h1 className="font-display italic text-4xl md:text-5xl text-foreground">{viewMode === "public" ? "Storyboard" : "Today"}</h1>
                     <div className="flex items-center bg-secondary rounded-xl p-1 border border-border">
                       <button 
                         onClick={() => setViewMode("private")}
@@ -901,6 +888,23 @@ const Home = () => {
                 </div>
               </div>
               <div className="max-w-2xl mx-auto px-10">
+                {/* Search bar for public / storyboard mode */}
+                {viewMode === "public" && (
+                  <div className="relative mb-6 -mt-2">
+                    <div className="rounded-2xl border border-border/60 bg-card/60 backdrop-blur-sm p-4 flex items-center gap-3 shadow-sm hover:border-accent/30 transition-all">
+                      <Search size={18} className="text-muted-foreground shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="ask me anything — what am I building? what do I think about…?"
+                        className="flex-1 bg-transparent font-body text-base text-foreground outline-none placeholder:text-muted-foreground/50"
+                      />
+                      <button className="px-4 py-2 rounded-xl bg-foreground text-background font-body text-xs font-medium hover:bg-foreground/90 transition-colors shrink-0">
+                        Ask
+                      </button>
+                    </div>
+                    <p className="font-body text-[11px] text-muted-foreground/50 mt-2 text-center">powered by cindy's brain ✨</p>
+                  </div>
+                )}
                 {/* Desktop writing area */}
                 <div className="relative mb-5 -mt-2">
                   <div className="rounded-2xl border border-border/60 bg-card/40 p-5 focus-within:border-accent/30 focus-within:bg-card/60 transition-all shadow-sm">
