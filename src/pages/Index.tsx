@@ -1,4 +1,4 @@
-import avatar from "@/assets/avatar-smiling.png";
+import avatar from "@/assets/avatar.png";
 import cityscape from "@/assets/cityscape-sketch.png";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -64,7 +64,7 @@ const Index = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 2.2 }}
-          className="font-body text-lg md:text-xl tracking-widest text-muted-foreground"
+          className="font-body text-lg md:text-xl tracking-widest text-foreground/70"
         >
           harvard grad · building startups · matcha lover · nyc
         </motion.p>
