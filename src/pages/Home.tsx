@@ -6,7 +6,7 @@ import {
   Briefcase, PanelLeftClose, PanelLeftOpen, Plus, StickyNote,
   Archive, X, ChevronDown, ChevronUp, Camera, Calendar, Send, MessageCircle,
   Hash, Share2, Check, Square, CheckSquare, ShoppingCart, Lightbulb,
-  ListTodo, BookMarked, Utensils, Target, Pen, Menu
+  ListTodo, BookMarked, Utensils, Target, Pen, Menu, Heart, Zap
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -198,6 +198,36 @@ const getGreeting = () => {
   return "good evening";
 };
 
+const getTimeOfDayContext = () => {
+  const h = new Date().getHours();
+  if (h < 12) return { period: "morning", emoji: "🌅", prompt: "Set an intention" };
+  if (h < 17) return { period: "afternoon", emoji: "☀️", prompt: "Energy check" };
+  return { period: "evening", emoji: "🌙", prompt: "Reflect on today" };
+};
+
+// Daily prompts — rotates based on day of year
+const DAILY_PROMPTS = [
+  "What's one thing you want to remember about today?",
+  "What scared you recently — and what did you learn?",
+  "Who made your week better? Tell them.",
+  "What would past-you be proud of right now?",
+  "What's something you're avoiding? Why?",
+  "Describe today in three words.",
+  "What's one small thing that brought you joy?",
+  "If you could tell tomorrow-you one thing, what would it be?",
+  "What's a belief you changed recently?",
+  "What does 'enough' look like today?",
+  "What's the bravest thing you did this week?",
+  "What conversation is stuck in your head?",
+  "What would you do if you weren't afraid?",
+  "Name one person you're grateful for today.",
+];
+
+const getDailyPrompt = () => {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  return DAILY_PROMPTS[dayOfYear % DAILY_PROMPTS.length];
+};
+
 const parseChecklist = (content: string): { text: string; checked: boolean }[] | undefined => {
   const lines = content.split("\n");
   const checkItems = lines.filter((l) => l.startsWith("☐ ") || l.startsWith("☑ "));
@@ -226,6 +256,9 @@ const Home = () => {
   const [activeTab, setActiveTab] = useState<"today" | "calendar" | "messages">("today");
   const [shareToast, setShareToast] = useState(false);
   const [expandedPinId, setExpandedPinId] = useState<string | null>(null);
+  const [swipeCardIndex, setSwipeCardIndex] = useState(0);
+  const [swipeComplete, setSwipeComplete] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -553,6 +586,39 @@ const Home = () => {
           <p className="font-body text-xs text-muted-foreground mt-0.5">What I'm building</p>
         </motion.div>
       </div>
+
+      {/* Weekly Digest Card */}
+      <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-5 overflow-hidden">
+        <MacDots />
+        <div className="flex items-center gap-2 mb-3">
+          <Zap size={14} className="text-accent" />
+          <p className="font-body text-xs tracking-widest text-accent uppercase">This Week</p>
+        </div>
+        {(() => {
+          const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const weekPins = pins.filter(p => p.createdAt > weekAgo && !p.archived);
+          const weekMoods = weekPins.filter(p => p.type === "mood");
+          const weekNotes = weekPins.filter(p => p.type === "note" || p.type === "moment");
+          const weekPhotos = weekPins.filter(p => p.type === "photo");
+          return weekPins.length > 0 ? (
+            <div className="space-y-2">
+              <p className="font-display text-lg text-foreground">{weekPins.length} moments</p>
+              <div className="flex items-center gap-4 font-body text-xs text-muted-foreground">
+                {weekNotes.length > 0 && <span>{weekNotes.length} thoughts</span>}
+                {weekMoods.length > 0 && <span>{weekMoods.map(m => m.content).join("")}</span>}
+                {weekPhotos.length > 0 && <span>{weekPhotos.length} 📸</span>}
+              </div>
+              {weekNotes.length > 0 && (
+                <p className="font-body text-sm text-muted-foreground/60 italic mt-2 line-clamp-2">
+                  "{weekNotes[0].content.split("\n")[0]}"
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="font-body text-sm text-muted-foreground/40">Start capturing moments to see your weekly digest</p>
+          );
+        })()}
+      </motion.div>
     </motion.div>
   );
 
@@ -606,251 +672,226 @@ const Home = () => {
       {activeTab === "today" && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="today">
           {isMobile ? (
-            /* ===== MOBILE: Living Timeline ===== */
             <div className="pb-8">
-              {/* Time-aware hero */}
-              <div className="px-5 pt-2 pb-6">
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-1"
-                >
-                  <p className="font-body text-sm text-muted-foreground/50">
-                    {getGreeting()}, cindy
-                  </p>
+              {/* Header */}
+              <div className="px-5 pt-2 pb-4">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                  <p className="font-body text-sm text-muted-foreground/50">{getGreeting()}, cindy</p>
                   <h1 className="font-display italic text-5xl text-foreground mt-1">Today</h1>
                 </motion.div>
-
-                {/* Context strip — what's happening */}
-                <motion.div
-                  className="flex gap-3 mt-5 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-none"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.15 }}
-                >
-                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-card border border-border shrink-0">
-                    <span className="text-lg">☀️</span>
-                    <div>
-                      <p className="font-body text-xs text-muted-foreground/50">NYC</p>
-                      <p className="font-body text-sm text-foreground">72°F</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-card border border-border shrink-0">
-                    <span className="text-lg">📅</span>
-                    <div>
-                      <p className="font-body text-xs text-muted-foreground/50">Next up</p>
-                      <p className="font-body text-sm text-foreground">Coffee w/ Sarah</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-card border border-border shrink-0">
-                    <span className="text-lg">💬</span>
-                    <div>
-                      <p className="font-body text-xs text-muted-foreground/50">Messages</p>
-                      <p className="font-body text-sm text-foreground">{chatMessages.length} new</p>
-                    </div>
-                  </div>
-                </motion.div>
               </div>
 
-              {/* Quick capture — text yourself */}
-              <motion.div
-                className="mx-5 mb-6"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <div className="flex items-end gap-2 bg-card rounded-2xl border border-border p-3">
-                  <div className="flex-1">
-                    <textarea
-                      ref={textareaRef}
-                      value={noteContent}
-                      onChange={(e) => setNoteContent(e.target.value)}
-                      placeholder="what's on your mind..."
-                      className="w-full bg-transparent font-body text-base text-foreground/80 leading-relaxed resize-none outline-none placeholder:text-muted-foreground/30 min-h-[40px] max-h-[120px]"
-                      rows={1}
-                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && noteContent.trim()) { e.preventDefault(); saveNote(); } }}
-                    />
-                    <div className="flex items-center gap-2 mt-1">
-                      <button onClick={() => fileInputRef.current?.click()} className="p-1.5 rounded-full text-muted-foreground/40 hover:text-muted-foreground">
-                        <Camera size={16} />
-                      </button>
-                      <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={addPhoto} />
-                      {/* Mood quick-add */}
-                      {["😊", "😌", "🔥", "😔", "🤔"].map((emoji) => (
-                        <button
-                          key={emoji}
-                          onClick={() => {
-                            setPins((prev) => [{
-                              id: crypto.randomUUID(), type: "mood" as const, content: emoji,
-                              tags: [], createdAt: Date.now(), archived: false,
-                            }, ...prev]);
-                          }}
-                          className="text-lg hover:scale-125 transition-transform"
-                        >
-                          {emoji}
-                        </button>
-                      ))}
+              {/* ===== SWIPEABLE CARD STACK ===== */}
+              {!swipeComplete && (() => {
+                const timeCtx = getTimeOfDayContext();
+                const recentMoods = activePins.filter(p => p.type === "mood").slice(0, 5);
+                const entryCount = activePins.length;
+                const cards = [
+                  {
+                    id: "prompt", emoji: "✨", label: "DAILY QUESTION",
+                    title: getDailyPrompt(),
+                    subtitle: "swipe right to answer, left to skip",
+                    color: "from-[hsl(38,35%,92%)] to-[hsl(28,30%,88%)]",
+                    action: () => { setNoteContent(getDailyPrompt() + "\n\n"); setTimeout(() => textareaRef.current?.focus(), 100); },
+                  },
+                  {
+                    id: "mood", emoji: timeCtx.emoji, label: timeCtx.prompt.toUpperCase(),
+                    title: `How are you feeling this ${timeCtx.period}?`,
+                    subtitle: "tap a mood, then swipe",
+                    color: "from-[hsl(48,40%,92%)] to-[hsl(42,35%,88%)]",
+                    isMoodCard: true,
+                  },
+                  {
+                    id: "growth", emoji: "📈", label: "YOUR WEEK",
+                    title: entryCount > 0 ? `${entryCount} moments captured` : "Start your story",
+                    subtitle: recentMoods.length > 0 ? `Recent vibes: ${recentMoods.map(m => m.content).join(" ")}` : "Every entry is a thread in your tapestry",
+                    color: "from-[hsl(200,25%,92%)] to-[hsl(190,20%,88%)]",
+                  },
+                ];
+
+                return (
+                  <div className="px-5 mb-6">
+                    <div className="relative h-[280px]">
+                      <AnimatePresence mode="popLayout">
+                        {cards.slice(swipeCardIndex).reverse().map((card, reversedIdx) => {
+                          const isTop = reversedIdx === cards.slice(swipeCardIndex).length - 1;
+                          const stackOffset = cards.slice(swipeCardIndex).length - 1 - reversedIdx;
+                          return (
+                            <motion.div
+                              key={card.id}
+                              className={`absolute inset-0 rounded-3xl border border-border p-6 flex flex-col justify-between bg-gradient-to-br ${card.color} ${isTop ? "cursor-grab active:cursor-grabbing" : ""}`}
+                              style={{ zIndex: isTop ? 10 : stackOffset, pointerEvents: isTop ? "auto" : "none" }}
+                              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                              animate={{ opacity: isTop ? 1 : Math.max(0.2, 0.6 - stackOffset * 0.2), scale: 1 - stackOffset * 0.04, y: stackOffset * 8, rotate: 0 }}
+                              exit={{ opacity: 0, x: swipeDirection === "right" ? 300 : -300, rotate: swipeDirection === "right" ? 15 : -15, transition: { duration: 0.3 } }}
+                              drag={isTop ? "x" : false}
+                              dragConstraints={{ left: 0, right: 0 }}
+                              dragElastic={0.8}
+                              onDragEnd={(_, info) => {
+                                if (Math.abs(info.offset.x) > 80) {
+                                  const dir = info.offset.x > 0 ? "right" : "left";
+                                  setSwipeDirection(dir);
+                                  if (dir === "right" && card.action) card.action();
+                                  setTimeout(() => {
+                                    setSwipeDirection(null);
+                                    if (swipeCardIndex >= cards.length - 1) setSwipeComplete(true);
+                                    else setSwipeCardIndex((prev) => prev + 1);
+                                  }, 300);
+                                }
+                              }}
+                            >
+                              <div>
+                                <span className="text-3xl mb-3 block">{card.emoji}</span>
+                                <p className="font-body text-[10px] tracking-[0.2em] text-foreground/40 uppercase mb-3">{card.label}</p>
+                                <h2 className="font-display italic text-2xl text-foreground leading-snug">{card.title}</h2>
+                              </div>
+                              {card.isMoodCard && isTop ? (
+                                <div className="flex gap-3 mt-4">
+                                  {["😊", "😌", "🔥", "😔", "🤔"].map((emoji) => (
+                                    <motion.button key={emoji} onClick={() => {
+                                      setPins((prev) => [{ id: crypto.randomUUID(), type: "mood" as const, content: emoji, tags: [], createdAt: Date.now(), archived: false }, ...prev]);
+                                    }} className="text-2xl p-2 rounded-2xl bg-background/40 hover:bg-background/70 active:scale-110 transition-all" whileTap={{ scale: 1.3 }}>{emoji}</motion.button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="font-body text-sm text-foreground/35 mt-4">{card.subtitle}</p>
+                              )}
+                              {isTop && (
+                                <div className="flex items-center justify-between mt-4">
+                                  <span className="font-body text-[10px] text-foreground/20">← skip</span>
+                                  <div className="flex gap-1.5">
+                                    {cards.map((_, i) => (
+                                      <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i <= swipeCardIndex ? "bg-foreground/30" : "bg-foreground/10"}`} />
+                                    ))}
+                                  </div>
+                                  <span className="font-body text-[10px] text-foreground/20">engage →</span>
+                                </div>
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                      </AnimatePresence>
+                    </div>
+                    <button onClick={() => setSwipeComplete(true)} className="w-full text-center font-body text-xs text-muted-foreground/30 mt-3 py-2">
+                      skip to stream →
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {/* ===== CAPTURE + TIMELINE ===== */}
+              {swipeComplete && (
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+                  <div className="mx-5 mb-6">
+                    <div className="flex items-end gap-2 bg-card rounded-2xl border border-border p-3">
+                      <div className="flex-1">
+                        <textarea ref={textareaRef} value={noteContent} onChange={(e) => setNoteContent(e.target.value)}
+                          placeholder="what's on your mind..."
+                          className="w-full bg-transparent font-body text-base text-foreground/80 leading-relaxed resize-none outline-none placeholder:text-muted-foreground/30 min-h-[40px] max-h-[120px]"
+                          rows={1} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && noteContent.trim()) { e.preventDefault(); saveNote(); } }} />
+                        <div className="flex items-center gap-2 mt-1">
+                          <button onClick={() => fileInputRef.current?.click()} className="p-1.5 rounded-full text-muted-foreground/40 hover:text-muted-foreground">
+                            <Camera size={16} />
+                          </button>
+                          <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={addPhoto} />
+                          {["😊", "😌", "🔥", "😔", "🤔"].map((emoji) => (
+                            <button key={emoji} onClick={() => {
+                              setPins((prev) => [{ id: crypto.randomUUID(), type: "mood" as const, content: emoji, tags: [], createdAt: Date.now(), archived: false }, ...prev]);
+                            }} className="text-lg hover:scale-125 transition-transform">{emoji}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <AnimatePresence>
+                        {noteContent.trim() && (
+                          <motion.button onClick={saveNote} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
+                            className="p-2.5 rounded-full bg-foreground text-background shrink-0 mb-0.5"><Send size={14} /></motion.button>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
-                  <AnimatePresence>
-                    {noteContent.trim() && (
-                      <motion.button
-                        onClick={saveNote}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        className="p-2.5 rounded-full bg-foreground text-background shrink-0 mb-0.5"
-                      >
-                        <Send size={14} />
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
 
-              {/* Living Timeline */}
-              <div className="relative">
-                {/* Timeline line */}
-                <div className="absolute left-8 top-0 bottom-0 w-px bg-border/50" />
-
-                <AnimatePresence>
-                  {activePins.length === 0 && (
-                    <motion.div
-                      className="text-center py-16 relative z-10"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.4 }}
-                    >
-                      <p className="font-display italic text-2xl text-muted-foreground/20 mb-2">your day starts here</p>
-                      <p className="font-body text-sm text-muted-foreground/25">type a thought, drop a mood, or snap a photo</p>
-                    </motion.div>
-                  )}
-
-                  {activePins.map((pin, index) => {
-                    const time = new Date(pin.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-                    const hasChecklist = pin.checklist && pin.checklist.length > 0;
-                    const primaryTag = pin.tags[0];
-                    const tagConfig = primaryTag ? TAGS[primaryTag] : null;
-
-                    return (
-                      <motion.div
-                        key={pin.id}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -50 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="relative flex gap-4 px-5 mb-1"
-                      >
-                        {/* Timeline dot */}
-                        <div className="relative z-10 mt-4 shrink-0">
-                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                            pin.type === "mood"
-                              ? "border-transparent bg-transparent text-lg"
-                              : pin.type === "photo"
-                              ? "border-accent/30 bg-accent/10"
-                              : "border-border bg-card"
-                          }`}>
-                            {pin.type === "mood" ? (
-                              <span className="text-base">{pin.content}</span>
-                            ) : pin.type === "photo" ? (
-                              <Camera size={10} className="text-accent" />
-                            ) : hasChecklist ? (
-                              <Check size={10} className="text-muted-foreground" />
-                            ) : (
-                              <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Entry content */}
-                        <div
-                          className="flex-1 pb-5 group cursor-pointer"
-                          onClick={() => pin.type !== "mood" && setExpandedPinId(pin.id)}
-                        >
-                          <p className="font-body text-[10px] text-muted-foreground/35 mb-1.5 tracking-wider uppercase">{time}</p>
-
-                          {pin.type === "mood" ? (
-                            <motion.div
-                              className="flex items-center gap-3"
-                              initial={{ scale: 0.9 }}
-                              animate={{ scale: 1 }}
-                            >
-                              <span className="text-3xl">{pin.content}</span>
-                              <p className="font-body text-sm text-muted-foreground/40 italic">feeling {
-                                pin.content === "😊" ? "good" :
-                                pin.content === "😌" ? "peaceful" :
-                                pin.content === "🔥" ? "fired up" :
-                                pin.content === "😔" ? "low" :
-                                pin.content === "🤔" ? "thoughtful" : "something"
-                              }</p>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); deletePin(pin.id); }}
-                                className="ml-auto p-1 rounded-full opacity-0 group-hover:opacity-100 text-muted-foreground/30 transition-opacity"
-                              >
-                                <X size={12} />
-                              </button>
-                            </motion.div>
-                          ) : pin.type === "photo" ? (
-                            <div className="rounded-2xl overflow-hidden border border-border bg-card">
-                              <img src={pin.content} alt="" className="w-full object-cover max-h-56" />
-                              {pin.caption && (
-                                <p className="font-body text-sm text-foreground/60 p-3 italic">{pin.caption}</p>
-                              )}
-                              {!pin.caption && (
-                                <p className="font-body text-xs text-muted-foreground/30 p-3">tap to add a caption</p>
-                              )}
-                            </div>
-                          ) : hasChecklist ? (
-                            <div className="rounded-2xl border border-border bg-card p-4">
-                              {pin.content.split("\n").filter((l) => !l.startsWith("☐ ") && !l.startsWith("☑ ") && l.trim()).slice(0, 1).map((line, i) => (
-                                <p key={i} className="font-display text-base text-foreground mb-2">{line}</p>
-                              ))}
-                              <div className="space-y-2">
-                                {pin.checklist!.slice(0, 3).map((ci, idx) => (
-                                  <button key={idx} onClick={(e) => { e.stopPropagation(); toggleCheckItem(pin.id, idx); }}
-                                    className="flex items-center gap-2.5 w-full text-left">
-                                    {ci.checked ? (
-                                      <div className="w-5 h-5 rounded-md bg-accent flex items-center justify-center shrink-0">
-                                        <Check size={11} className="text-background" />
-                                      </div>
-                                    ) : (
-                                      <div className="w-5 h-5 rounded-md border-2 border-border shrink-0" />
-                                    )}
-                                    <span className={`font-body text-sm ${ci.checked ? "line-through text-muted-foreground/30" : "text-foreground/70"}`}>
-                                      {ci.text || "..."}
-                                    </span>
-                                  </button>
-                                ))}
-                                {pin.checklist!.length > 3 && (
-                                  <p className="font-body text-xs text-muted-foreground/30 pl-7">+{pin.checklist!.length - 3} more →</p>
-                                )}
+                  <div className="relative">
+                    <div className="absolute left-8 top-0 bottom-0 w-px bg-border/50" />
+                    <AnimatePresence>
+                      {activePins.length === 0 && (
+                        <motion.div className="text-center py-16 relative z-10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
+                          <p className="font-display italic text-2xl text-muted-foreground/20 mb-2">your day starts here</p>
+                          <p className="font-body text-sm text-muted-foreground/25">type a thought, drop a mood, or snap a photo</p>
+                        </motion.div>
+                      )}
+                      {activePins.map((pin, index) => {
+                        const time = new Date(pin.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                        const hasChecklist = pin.checklist && pin.checklist.length > 0;
+                        return (
+                          <motion.div key={pin.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -50 }}
+                            transition={{ delay: index * 0.05 }} className="relative flex gap-4 px-5 mb-1">
+                            <div className="relative z-10 mt-4 shrink-0">
+                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                                pin.type === "mood" ? "border-transparent bg-transparent" : pin.type === "photo" ? "border-accent/30 bg-accent/10" : "border-border bg-card"
+                              }`}>
+                                {pin.type === "mood" ? <span className="text-base">{pin.content}</span>
+                                  : pin.type === "photo" ? <Camera size={10} className="text-accent" />
+                                  : hasChecklist ? <Check size={10} className="text-muted-foreground" />
+                                  : <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />}
                               </div>
                             </div>
-                          ) : (
-                            <div className="group-active:scale-[0.98] transition-transform">
-                              {(() => {
-                                const lines = pin.content.split("\n");
-                                const isShort = lines.length <= 2 && pin.content.length < 80;
-                                return isShort ? (
-                                  <p className="font-body text-base text-foreground/80 leading-relaxed">{pin.content}</p>
-                                ) : (
-                                  <div className="rounded-2xl border border-border bg-card p-4">
-                                    <p className="font-display text-base text-foreground leading-snug mb-1">{lines[0]}</p>
-                                    {lines.length > 1 && (
-                                      <p className="font-body text-sm text-muted-foreground/50 line-clamp-2">{lines.slice(1).join("\n")}</p>
-                                    )}
-                                    <ArrowRight size={14} className="text-muted-foreground/20 mt-2" />
+                            <div className="flex-1 pb-5 group cursor-pointer" onClick={() => pin.type !== "mood" && setExpandedPinId(pin.id)}>
+                              <p className="font-body text-[10px] text-muted-foreground/35 mb-1.5 tracking-wider uppercase">{time}</p>
+                              {pin.type === "mood" ? (
+                                <motion.div className="flex items-center gap-3" initial={{ scale: 0.9 }} animate={{ scale: 1 }}>
+                                  <span className="text-3xl">{pin.content}</span>
+                                  <p className="font-body text-sm text-muted-foreground/40 italic">feeling {
+                                    pin.content === "😊" ? "good" : pin.content === "😌" ? "peaceful" : pin.content === "🔥" ? "fired up" : pin.content === "😔" ? "low" : pin.content === "🤔" ? "thoughtful" : "something"
+                                  }</p>
+                                  <button onClick={(e) => { e.stopPropagation(); deletePin(pin.id); }}
+                                    className="ml-auto p-1 rounded-full opacity-0 group-hover:opacity-100 text-muted-foreground/30 transition-opacity"><X size={12} /></button>
+                                </motion.div>
+                              ) : pin.type === "photo" ? (
+                                <div className="rounded-2xl overflow-hidden border border-border bg-card">
+                                  <img src={pin.content} alt="" className="w-full object-cover max-h-56" />
+                                  <p className="font-body text-sm p-3 italic text-foreground/60">{pin.caption || "tap to add a caption"}</p>
+                                </div>
+                              ) : hasChecklist ? (
+                                <div className="rounded-2xl border border-border bg-card p-4">
+                                  {pin.content.split("\n").filter((l) => !l.startsWith("☐ ") && !l.startsWith("☑ ") && l.trim()).slice(0, 1).map((line, i) => (
+                                    <p key={i} className="font-display text-base text-foreground mb-2">{line}</p>
+                                  ))}
+                                  <div className="space-y-2">
+                                    {pin.checklist!.slice(0, 3).map((ci, idx) => (
+                                      <button key={idx} onClick={(e) => { e.stopPropagation(); toggleCheckItem(pin.id, idx); }} className="flex items-center gap-2.5 w-full text-left">
+                                        {ci.checked ? <div className="w-5 h-5 rounded-md bg-accent flex items-center justify-center shrink-0"><Check size={11} className="text-background" /></div>
+                                          : <div className="w-5 h-5 rounded-md border-2 border-border shrink-0" />}
+                                        <span className={`font-body text-sm ${ci.checked ? "line-through text-muted-foreground/30" : "text-foreground/70"}`}>{ci.text || "..."}</span>
+                                      </button>
+                                    ))}
+                                    {pin.checklist!.length > 3 && <p className="font-body text-xs text-muted-foreground/30 pl-7">+{pin.checklist!.length - 3} more →</p>}
                                   </div>
-                                );
-                              })()}
+                                </div>
+                              ) : (
+                                <div className="group-active:scale-[0.98] transition-transform">
+                                  {(() => {
+                                    const lines = pin.content.split("\n");
+                                    const isShort = lines.length <= 2 && pin.content.length < 80;
+                                    return isShort ? (
+                                      <p className="font-body text-base text-foreground/80 leading-relaxed">{pin.content}</p>
+                                    ) : (
+                                      <div className="rounded-2xl border border-border bg-card p-4">
+                                        <p className="font-display text-base text-foreground leading-snug mb-1">{lines[0]}</p>
+                                        {lines.length > 1 && <p className="font-body text-sm text-muted-foreground/50 line-clamp-2">{lines.slice(1).join("\n")}</p>}
+                                        <ArrowRight size={14} className="text-muted-foreground/20 mt-2" />
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              )}
             </div>
           ) : (
             /* ===== DESKTOP: Keep existing layout ===== */
