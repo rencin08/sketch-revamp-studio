@@ -66,7 +66,7 @@ const Index = () => {
           transition={{ duration: 0.8, delay: 2.2 }}
           className="font-body text-lg md:text-xl tracking-widest text-muted-foreground"
         >
-          harvard grad · building startups · matcha · nyc
+          harvard grad · building startups · matcha lover · nyc
         </motion.p>
 
         <motion.button
