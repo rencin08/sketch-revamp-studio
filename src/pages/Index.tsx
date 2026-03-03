@@ -1,4 +1,4 @@
-import avatar from "@/assets/avatar.png";
+import avatar from "@/assets/avatar-smiling.png";
 import cityscape from "@/assets/cityscape-sketch.png";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -40,35 +40,18 @@ const Index = () => {
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center gap-6">
-        <div className="relative">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="w-44 h-44 md:w-56 md:h-56 rounded-full border-2 border-border overflow-hidden bg-background/60 backdrop-blur-sm"
-          >
-            <img
-              src={avatar}
-              alt="Cindy's avatar"
-              className="w-full h-full object-cover"
-            />
-          </motion.div>
-          {/* Animated wink/smile emoji */}
-          <motion.span
-            className="absolute -bottom-1 -right-1 text-3xl md:text-4xl select-none"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 1.2, type: "spring", stiffness: 300 }}
-          >
-            <motion.span
-              className="inline-block"
-              animate={{ rotate: [0, 15, -10, 0], scale: [1, 1.2, 1] }}
-              transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-            >
-              😊
-            </motion.span>
-          </motion.span>
-        </div>
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="w-44 h-44 md:w-56 md:h-56 rounded-full border-2 border-border overflow-hidden bg-background/60 backdrop-blur-sm"
+        >
+          <img
+            src={avatar}
+            alt="Cindy's avatar"
+            className="w-full h-full object-cover"
+          />
+        </motion.div>
 
         <TypingText
           text="welcome to cindy's home"
