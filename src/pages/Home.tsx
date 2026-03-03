@@ -857,7 +857,7 @@ const Home = () => {
             /* ===== DESKTOP: Keep existing layout ===== */
             <>
               <div className="relative overflow-hidden" style={{ minHeight: 160 }}>
-                <div className="absolute inset-0 bg-contain bg-bottom bg-no-repeat opacity-[0.25]" style={{ backgroundImage: `url(${cityscape})` }} />
+                <div className="absolute inset-0 bg-cover bg-bottom bg-no-repeat opacity-[0.25]" style={{ backgroundImage: `url(${cityscape})` }} />
                 <div className="absolute inset-0 bg-gradient-to-b from-background/0 via-background/10 to-background/80" />
                 <div className="relative max-w-2xl mx-auto px-10 pt-4 pb-4">
                   <motion.p className="font-body text-sm text-foreground/60 mb-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
@@ -905,67 +905,71 @@ const Home = () => {
                     <p className="font-body text-[11px] text-muted-foreground/50 mt-2 text-center">powered by cindy's brain ✨</p>
                   </div>
                 )}
-                {/* Desktop writing area */}
-                <div className="relative mb-5 -mt-2">
-                  <div className="rounded-2xl border border-border/60 bg-card/40 p-5 focus-within:border-accent/30 focus-within:bg-card/60 transition-all shadow-sm">
-                    <textarea
-                      ref={textareaRef}
-                      value={noteContent}
-                      onChange={(e) => setNoteContent(e.target.value)}
-                      placeholder="what's on your mind? pick a tag below to get started with a template ✏️"
-                      className="w-full bg-transparent font-body text-base md:text-lg text-foreground/90 leading-relaxed resize-none outline-none placeholder:text-muted-foreground/35 min-h-[100px]"
-                      onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) saveNote(); }}
-                    />
-                    {selectedTags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-2">
-                        {selectedTags.map((tag) => {
-                          const config = TAGS[tag];
-                          const Icon = config?.icon;
+                {/* Desktop writing area - private only */}
+                {viewMode === "private" && (
+                  <>
+                    <div className="relative mb-5 -mt-2">
+                      <div className="rounded-2xl border border-border/60 bg-card/40 p-5 focus-within:border-accent/30 focus-within:bg-card/60 transition-all shadow-sm">
+                        <textarea
+                          ref={textareaRef}
+                          value={noteContent}
+                          onChange={(e) => setNoteContent(e.target.value)}
+                          placeholder="what's on your mind? pick a tag below to get started with a template ✏️"
+                          className="w-full bg-transparent font-body text-base md:text-lg text-foreground/90 leading-relaxed resize-none outline-none placeholder:text-muted-foreground/35 min-h-[100px]"
+                          onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) saveNote(); }}
+                        />
+                        {selectedTags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {selectedTags.map((tag) => {
+                              const config = TAGS[tag];
+                              const Icon = config?.icon;
+                              return (
+                                <button key={tag} onClick={() => selectTag(tag)}
+                                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${config?.color || "bg-muted text-muted-foreground"}`}>
+                                  {Icon && <Icon size={10} />} #{tag} <X size={10} />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between mt-2 pt-3 border-t border-border/30">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => fileInputRef.current?.click()}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/50 hover:bg-accent/10 hover:border-accent/30 font-body text-xs text-muted-foreground hover:text-foreground transition-all">
+                              <Camera size={13} /> Photo
+                            </button>
+                            <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={addPhoto} />
+                          </div>
+                          <AnimatePresence>
+                            {noteContent.trim() && (
+                              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="flex items-center gap-2">
+                                <span className="font-body text-xs text-muted-foreground/40">⌘ + Enter</span>
+                                <button onClick={saveNote} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-accent-foreground font-body text-xs hover:bg-accent/90 transition-colors">
+                                  <Plus size={12} /> Pin it
+                                </button>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {Object.entries(TAGS).map(([key, config]) => {
+                          const Icon = config.icon;
+                          const isSelected = selectedTags.includes(key);
                           return (
-                            <button key={tag} onClick={() => selectTag(tag)}
-                              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-body transition-all ${config?.color || "bg-muted text-muted-foreground"}`}>
-                              {Icon && <Icon size={10} />} #{tag} <X size={10} />
+                            <button key={key} onClick={() => selectTag(key)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-body text-xs transition-all ${
+                                isSelected ? `${config.color} ring-1 ring-accent/20 shadow-sm` : "bg-card/60 text-muted-foreground hover:text-foreground border border-border/40 hover:border-accent/30"
+                              }`}>
+                              <Icon size={12} /> {config.label}
+                              {config.template && !isSelected && <span className="text-[9px] opacity-40 ml-0.5">✦</span>}
                             </button>
                           );
                         })}
                       </div>
-                    )}
-                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-border/30">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => fileInputRef.current?.click()}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/50 hover:bg-accent/10 hover:border-accent/30 font-body text-xs text-muted-foreground hover:text-foreground transition-all">
-                          <Camera size={13} /> Photo
-                        </button>
-                        <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={addPhoto} />
-                      </div>
-                      <AnimatePresence>
-                        {noteContent.trim() && (
-                          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="flex items-center gap-2">
-                            <span className="font-body text-xs text-muted-foreground/40">⌘ + Enter</span>
-                            <button onClick={saveNote} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-accent-foreground font-body text-xs hover:bg-accent/90 transition-colors">
-                              <Plus size={12} /> Pin it
-                            </button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
                     </div>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    {Object.entries(TAGS).map(([key, config]) => {
-                      const Icon = config.icon;
-                      const isSelected = selectedTags.includes(key);
-                      return (
-                        <button key={key} onClick={() => selectTag(key)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-body text-xs transition-all ${
-                            isSelected ? `${config.color} ring-1 ring-accent/20 shadow-sm` : "bg-card/60 text-muted-foreground hover:text-foreground border border-border/40 hover:border-accent/30"
-                          }`}>
-                          <Icon size={12} /> {config.label}
-                          {config.template && !isSelected && <span className="text-[9px] opacity-40 ml-0.5">✦</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                  </>
+                )}
 
                 {activePins.length > 0 && (() => {
                   const { groups, ungrouped } = groupPinsByTag(activePins);
