@@ -673,165 +673,198 @@ const Home = () => {
       {activeTab === "today" && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} key="today">
           {isMobile ? (
-             <div className="pb-8">
-              {/* ===== NOTEBOOK PAGE ===== */}
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
-                <div className="px-6 pt-3">
-                  {/* Notebook header — large date watermark */}
-                  <motion.div 
-                    className="relative mb-8"
-                    initial={{ opacity: 0, y: 15 }} 
-                    animate={{ opacity: 1, y: 0 }} 
-                    transition={{ delay: 0.15, duration: 0.5 }}
-                  >
-                    <span className="font-display text-[96px] leading-none text-foreground/[0.04] select-none absolute -top-4 -left-2">{canvasDate.dayNum}</span>
-                    <div className="relative pt-10">
-                      <h1 className="font-display italic text-3xl text-foreground leading-tight">{canvasDate.weekday}</h1>
-                      <p className="font-body text-xs tracking-[0.2em] text-muted-foreground/35 uppercase mt-1">{canvasDate.monthYear}</p>
-                    </div>
-                  </motion.div>
+             <div className="pb-24">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+                {/* Header: Today + Date */}
+                <div className="px-6 pt-2 pb-4">
+                  <div className="flex items-baseline justify-between mb-5">
+                    <h1 className="font-display text-4xl text-foreground">Today</h1>
+                    <p className="font-body text-sm text-muted-foreground">
+                      {today.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </p>
+                  </div>
 
-                  {/* Daily prompt as margin note */}
-                  <motion.p
-                    className="font-display italic text-sm text-muted-foreground/25 mb-6 leading-relaxed"
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }} 
-                    transition={{ delay: 0.4, duration: 0.6 }}
-                  >
-                    "{getDailyPrompt()}"
-                  </motion.p>
+                  {/* Today / Archive tab switcher */}
+                  <div className="flex mb-5 bg-secondary rounded-xl p-1">
+                    <button 
+                      onClick={() => setShowArchive(false)}
+                      className={`flex-1 py-2 rounded-lg font-body text-sm font-medium transition-all ${
+                        !showArchive ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
+                      }`}
+                    >
+                      Today
+                    </button>
+                    <button 
+                      onClick={() => setShowArchive(true)}
+                      className={`flex-1 py-2 rounded-lg font-body text-sm font-medium transition-all ${
+                        showArchive ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
+                      }`}
+                    >
+                      Archive
+                    </button>
+                  </div>
 
-                  {/* === The writing area — notebook feel === */}
-                  <motion.div 
-                    className="relative"
-                    initial={{ opacity: 0, y: 8 }} 
-                    animate={{ opacity: 1, y: 0 }} 
-                    transition={{ delay: 0.3, duration: 0.4 }}
-                  >
-                    <textarea 
-                      ref={textareaRef} 
-                      value={noteContent} 
-                      onChange={(e) => setNoteContent(e.target.value)}
-                      placeholder="start writing..."
-                      className="w-full bg-transparent font-body text-[17px] text-foreground/80 leading-[2.2] resize-none outline-none placeholder:text-muted-foreground/15 min-h-[200px]"
-                      style={{ 
-                        backgroundImage: "repeating-linear-gradient(transparent, transparent calc(2.2em - 1px), hsl(var(--border) / 0.12) calc(2.2em - 1px), hsl(var(--border) / 0.12) 2.2em)", 
-                        backgroundAttachment: "local",
-                        backgroundPosition: "0 0.1em"
-                      }}
-                      onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey && noteContent.trim()) { e.preventDefault(); saveNote(); } }}
-                    />
-
-                    {/* Subtle left margin line */}
-                    <div className="absolute left-[-12px] top-0 bottom-0 w-px bg-[hsl(0,60%,70%,0.08)]" />
-                  </motion.div>
-
-                  {/* Minimal toolbar — appears inline */}
-                  <motion.div 
-                    className="flex items-center justify-between mt-2 mb-4"
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }} 
-                    transition={{ delay: 0.5 }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-lg text-muted-foreground/25 hover:text-muted-foreground transition-colors">
-                        <Camera size={18} />
-                      </button>
-                      <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={addPhoto} />
-                      {["😊", "😌", "🔥", "😔", "🤔"].map((emoji) => (
-                        <motion.button key={emoji} onClick={() => {
-                          setPins((prev) => [{ id: crypto.randomUUID(), type: "mood" as const, content: emoji, tags: [], createdAt: Date.now(), archived: false }, ...prev]);
-                        }} className="text-base p-1 opacity-40 hover:opacity-100 active:scale-125 transition-all" whileTap={{ scale: 1.3 }}>{emoji}</motion.button>
-                      ))}
-                    </div>
-                    <AnimatePresence>
-                      {noteContent.trim() && (
-                        <motion.button onClick={saveNote} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
-                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-foreground text-background font-body text-xs transition-all active:scale-95">
-                          <Plus size={12} /> Pin
-                        </motion.button>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-
-                  {/* Tag chips — quiet row */}
-                  <div className="flex flex-wrap gap-1.5 mb-6">
+                  {/* Tag filter chips */}
+                  <div className="flex flex-wrap gap-2 mb-5">
                     {Object.entries(TAGS).slice(0, 6).map(([key, config]) => {
                       const Icon = config.icon;
                       const isSelected = selectedTags.includes(key);
                       return (
                         <button key={key} onClick={() => selectTag(key)}
-                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-body transition-all ${
-                            isSelected ? `${config.color} ring-1 ring-accent/20` : "text-muted-foreground/25 hover:text-muted-foreground/50"
+                          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border font-body text-sm transition-all ${
+                            isSelected 
+                              ? "border-foreground bg-foreground/5 text-foreground" 
+                              : "border-border bg-background text-muted-foreground hover:border-foreground/30"
                           }`}>
-                          <Icon size={9} /> {config.label}
+                          <Icon size={14} /> {config.label.toLowerCase()}
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Today's entries */}
-                {activePins.length > 0 && (
-                  <div className="px-6 mb-3">
-                    <div className="h-px bg-border/20 mb-1" />
+                {/* Quick capture input */}
+                {!showArchive && (
+                  <div className="px-6 mb-4">
+                    <div className="rounded-2xl border-2 border-border bg-card p-4">
+                      <textarea 
+                        ref={textareaRef} 
+                        value={noteContent} 
+                        onChange={(e) => setNoteContent(e.target.value)}
+                        placeholder="write something..."
+                        className="w-full bg-transparent font-body text-base text-foreground resize-none outline-none placeholder:text-muted-foreground/40 min-h-[60px]"
+                        onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey && noteContent.trim()) { e.preventDefault(); saveNote(); } }}
+                      />
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => fileInputRef.current?.click()} className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-muted-foreground transition-colors">
+                            <Camera size={18} />
+                          </button>
+                          <input ref={fileInputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={addPhoto} />
+                          {["😊", "😌", "🔥", "😔"].map((emoji) => (
+                            <button key={emoji} onClick={() => {
+                              setPins((prev) => [{ id: crypto.randomUUID(), type: "mood" as const, content: emoji, tags: [], createdAt: Date.now(), archived: false }, ...prev]);
+                            }} className="text-base p-1 opacity-40 hover:opacity-100 transition-all">{emoji}</button>
+                          ))}
+                        </div>
+                        <AnimatePresence>
+                          {noteContent.trim() && (
+                            <motion.button onClick={saveNote} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
+                              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-foreground text-background font-body text-xs font-medium transition-all active:scale-95">
+                              <Plus size={12} /> Pin
+                            </motion.button>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                <div className="relative">
-                  <AnimatePresence>
-                    {activePins.length === 0 && (
-                      <motion.div className="text-center py-16" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}>
-                        <motion.div animate={{ y: [0, -3, 0] }} transition={{ duration: 4, repeat: Infinity }}>
-                          <Pen size={18} className="text-muted-foreground/10 mx-auto mb-3" />
-                        </motion.div>
-                        <p className="font-display italic text-muted-foreground/12 text-lg">your page awaits</p>
-                      </motion.div>
-                    )}
-                    {activePins.map((pin, index) => {
-                      const time = new Date(pin.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-                      const hasChecklist = pin.checklist && pin.checklist.length > 0;
+                {/* Card grid */}
+                <div className="px-6">
+                  {(() => {
+                    const displayPins = showArchive ? archivedPins : activePins;
+                    if (displayPins.length === 0) {
                       return (
-                        <motion.div key={pin.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -40 }}
-                          transition={{ delay: index * 0.04 }} className="px-6 mb-3">
-                          <div className="group cursor-pointer" onClick={() => pin.type !== "mood" && setExpandedPinId(pin.id)}>
-                            <p className="font-body text-[10px] text-muted-foreground/25 mb-1 tracking-wider">{time}</p>
-                            {pin.type === "mood" ? (
-                              <div className="flex items-center gap-2.5">
-                                <span className="text-2xl">{pin.content}</span>
-                                <p className="font-body text-sm text-muted-foreground/30 italic">feeling {
-                                  pin.content === "😊" ? "good" : pin.content === "😌" ? "peaceful" : pin.content === "🔥" ? "fired up" : pin.content === "😔" ? "low" : pin.content === "🤔" ? "thoughtful" : "something"
-                                }</p>
-                                <button onClick={(e) => { e.stopPropagation(); deletePin(pin.id); }}
-                                  className="ml-auto p-1 opacity-0 group-hover:opacity-100 text-muted-foreground/20 transition-opacity"><X size={12} /></button>
-                              </div>
-                            ) : pin.type === "photo" ? (
-                              <div className="rounded-xl overflow-hidden border border-border/40">
-                                <img src={pin.content} alt="" className="w-full object-cover max-h-52" />
-                                {pin.caption && <p className="font-body text-sm p-3 italic text-foreground/50">{pin.caption}</p>}
-                              </div>
-                            ) : hasChecklist ? (
-                              <div className="space-y-1.5">
-                                {pin.content.split("\n").filter((l) => !l.startsWith("☐ ") && !l.startsWith("☑ ") && l.trim()).slice(0, 1).map((line, i) => (
-                                  <p key={i} className="font-body text-sm text-foreground/70 font-medium">{line}</p>
-                                ))}
-                                {pin.checklist!.slice(0, 3).map((ci, idx) => (
-                                  <button key={idx} onClick={(e) => { e.stopPropagation(); toggleCheckItem(pin.id, idx); }} className="flex items-center gap-2 w-full text-left">
-                                    {ci.checked ? <CheckSquare size={14} className="text-accent/50 shrink-0" /> : <Square size={14} className="text-muted-foreground/20 shrink-0" />}
-                                    <span className={`font-body text-sm ${ci.checked ? "line-through text-muted-foreground/25" : "text-foreground/60"}`}>{ci.text || "..."}</span>
-                                  </button>
-                                ))}
-                                {pin.checklist!.length > 3 && <p className="font-body text-[10px] text-muted-foreground/20 pl-5">+{pin.checklist!.length - 3} more</p>}
-                              </div>
-                            ) : (
-                              <p className="font-body text-sm text-foreground/65 leading-relaxed whitespace-pre-wrap">{pin.content}</p>
-                            )}
-                          </div>
-                          <div className="h-px bg-border/10 mt-3" />
+                        <motion.div className="text-center py-16" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                          <Pen size={20} className="text-muted-foreground/15 mx-auto mb-3" />
+                          <p className="font-display italic text-muted-foreground/20 text-lg">
+                            {showArchive ? "no archived entries yet" : "your page awaits"}
+                          </p>
                         </motion.div>
                       );
-                    })}
-                  </AnimatePresence>
+                    }
+
+                    // Build masonry-style two-column layout
+                    const col1: PinItem[] = [];
+                    const col2: PinItem[] = [];
+                    displayPins.forEach((pin, i) => {
+                      if (i % 2 === 0) col1.push(pin);
+                      else col2.push(pin);
+                    });
+
+                    const renderMobileCard = (pin: PinItem) => {
+                      const hasChecklist = pin.checklist && pin.checklist.length > 0;
+                      const primaryTag = pin.tags[0];
+                      const tagConfig = primaryTag ? TAGS[primaryTag] : null;
+                      const categoryLabel = hasChecklist ? "TODO" : pin.type === "photo" ? "PHOTO" : pin.type === "mood" ? "MOOD" : tagConfig?.label?.toUpperCase() || "NOTE";
+
+                      return (
+                        <motion.div
+                          key={pin.id}
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="rounded-2xl border-2 border-border bg-card overflow-hidden group relative mb-3"
+                          onClick={() => pin.type !== "mood" && setExpandedPinId(pin.id)}
+                        >
+                          {/* Hover delete */}
+                          <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={(e) => { e.stopPropagation(); showArchive ? unarchivePin(pin.id) : archivePin(pin.id); }}
+                              className="p-1 rounded-lg bg-background/80 text-muted-foreground hover:text-foreground">
+                              <Archive size={12} />
+                            </button>
+                          </div>
+
+                          <div className="p-4">
+                            {/* Category label */}
+                            <p className="font-body text-[11px] font-semibold tracking-[0.15em] text-muted-foreground mb-1.5">{categoryLabel}</p>
+
+                            {pin.type === "mood" ? (
+                              <span className="text-3xl">{pin.content}</span>
+                            ) : pin.type === "photo" ? (
+                              <>
+                                <div className="rounded-xl overflow-hidden bg-secondary mb-2 -mx-1">
+                                  <img src={pin.content} alt="" className="w-full object-cover max-h-36" />
+                                </div>
+                                {pin.caption && <p className="font-body text-sm text-muted-foreground italic">{pin.caption}</p>}
+                              </>
+                            ) : hasChecklist ? (
+                              <>
+                                {pin.content.split("\n").filter((l) => !l.startsWith("☐ ") && !l.startsWith("☑ ") && l.trim()).slice(0, 1).map((line, i) => (
+                                  <h3 key={i} className="font-display text-lg text-foreground font-semibold mb-2">{line}</h3>
+                                ))}
+                                <div className="space-y-2">
+                                  {pin.checklist!.map((ci, idx) => (
+                                    <button key={idx} onClick={(e) => { e.stopPropagation(); toggleCheckItem(pin.id, idx); }} className="flex items-center gap-2.5 w-full text-left">
+                                      {ci.checked ? <CheckSquare size={16} className="text-foreground shrink-0" /> : <Square size={16} className="text-muted-foreground/40 shrink-0" />}
+                                      <span className={`font-body text-sm ${ci.checked ? "line-through text-muted-foreground/40" : "text-foreground/80"}`}>{ci.text || "..."}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                {(() => {
+                                  const lines = pin.content.split("\n");
+                                  const title = lines[0];
+                                  const body = lines.slice(1).join("\n").trim();
+                                  return (
+                                    <>
+                                      <h3 className="font-display text-lg text-foreground font-semibold mb-1">{title}</h3>
+                                      {body && <p className="font-body text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{body}</p>}
+                                    </>
+                                  );
+                                })()}
+                              </>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    };
+
+                    return (
+                      <div className="grid grid-cols-2 gap-3 items-start">
+                        <div>
+                          <AnimatePresence>{col1.map(renderMobileCard)}</AnimatePresence>
+                        </div>
+                        <div>
+                          <AnimatePresence>{col2.map(renderMobileCard)}</AnimatePresence>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </motion.div>
             </div>
