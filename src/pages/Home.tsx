@@ -562,8 +562,8 @@ const Home = () => {
           <BookOpen size={18} className="text-secondary-foreground" />
         </div>
         <p className="font-body text-xs tracking-widest text-accent uppercase mb-1">Thoughts & Reflections</p>
-        <h3 className="font-display text-lg text-foreground mb-1">Essays on growing up</h3>
-        <p className="font-body text-sm text-muted-foreground">Leaving finance, building startups, and figuring out life in your 20s.</p>
+        <h3 className="font-display text-lg text-foreground mb-1">Reflections & thoughts</h3>
+        <p className="font-body text-sm text-muted-foreground">On leaving finance, building startups, and figuring out life in your 20s.</p>
         <ArrowRight size={14} className="text-accent mt-3 group-hover:translate-x-1 transition-transform" />
       </motion.div>
 
@@ -577,12 +577,13 @@ const Home = () => {
           <h3 className="font-display text-sm text-foreground">AI Hub</h3>
           <p className="font-body text-xs text-muted-foreground mt-0.5">Learning notes</p>
         </motion.div>
-        <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-accent/30 transition-colors">
+        <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-accent/30 transition-colors group">
           <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center mb-2">
             <Briefcase size={16} className="text-accent" />
           </div>
           <h3 className="font-display text-sm text-foreground">Projects</h3>
           <p className="font-body text-xs text-muted-foreground mt-0.5">What I'm building</p>
+          <ArrowRight size={12} className="text-accent mt-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
         </motion.div>
       </div>
 
@@ -994,7 +995,7 @@ const Home = () => {
                   );
                 })()}
 
-                {activePins.length === 0 && (
+                {activePins.length === 0 && viewMode === "private" && (
                   <motion.div className="text-center py-10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
                     <motion.div animate={{ y: [0, -5, 0] }} transition={{ duration: 3, repeat: Infinity }}>
                       <StickyNote size={28} className="text-muted-foreground/40 mx-auto mb-3" />
