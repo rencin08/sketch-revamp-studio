@@ -245,6 +245,7 @@ const parseChecklist = (content: string): { text: string; checked: boolean }[] |
 
 const Home = () => {
   const isMobile = useIsMobile();
+  const isOwner = new URLSearchParams(window.location.search).has("admin");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pins, setPins] = useState<PinItem[]>(loadPins);
@@ -257,7 +258,7 @@ const Home = () => {
   const [chatName, setChatName] = useState(() => localStorage.getItem("cindy-chat-name") || "");
   const [showNameInput, setShowNameInput] = useState(false);
   const [activeTab, setActiveTab] = useState<"today" | "calendar" | "messages">("today");
-  const [viewMode, setViewMode] = useState<"private" | "public">("private");
+  const [viewMode, setViewMode] = useState<"private" | "public">(isOwner ? "private" : "public");
   const [shareToast, setShareToast] = useState(false);
   const [expandedPinId, setExpandedPinId] = useState<string | null>(null);
   const [canvasDate] = useState(() => {
@@ -651,25 +652,27 @@ const Home = () => {
                     </p>
                   </div>
 
-                  {/* Public / Private toggle */}
-                  <div className="flex mb-5 bg-secondary rounded-xl p-1">
-                    <button 
-                      onClick={() => setViewMode("private")}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg font-body text-sm font-medium transition-all ${
-                        viewMode === "private" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
-                      }`}
-                    >
-                      <Lock size={13} /> Private
-                    </button>
-                    <button 
-                      onClick={() => setViewMode("public")}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg font-body text-sm font-medium transition-all ${
-                        viewMode === "public" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
-                      }`}
-                    >
-                      <Globe size={13} /> Public
-                    </button>
-                  </div>
+                  {/* Public / Private toggle - owner only */}
+                  {isOwner && (
+                    <div className="flex mb-5 bg-secondary rounded-xl p-1">
+                      <button 
+                        onClick={() => setViewMode("private")}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg font-body text-sm font-medium transition-all ${
+                          viewMode === "private" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
+                        }`}
+                      >
+                        <Lock size={13} /> Private
+                      </button>
+                      <button 
+                        onClick={() => setViewMode("public")}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg font-body text-sm font-medium transition-all ${
+                          viewMode === "public" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
+                        }`}
+                      >
+                        <Globe size={13} /> Public
+                      </button>
+                    </div>
+                  )}
 
 
                   {/* Tag filter chips - private only */}
@@ -868,24 +871,26 @@ const Home = () => {
                   </motion.p>
                   <div className="flex items-center justify-between mb-3 mt-1">
                     <h1 className="font-display italic text-4xl md:text-5xl text-foreground">{viewMode === "public" ? "Storyboard" : "Today"}</h1>
-                    <div className="flex items-center bg-secondary rounded-xl p-1 border border-border">
-                      <button 
-                        onClick={() => setViewMode("private")}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs transition-all ${
-                          viewMode === "private" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <Lock size={12} /> Private
-                      </button>
-                      <button 
-                        onClick={() => setViewMode("public")}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs transition-all ${
-                          viewMode === "public" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <Globe size={12} /> Public
-                      </button>
-                    </div>
+                    {isOwner && (
+                      <div className="flex items-center bg-secondary rounded-xl p-1 border border-border">
+                        <button 
+                          onClick={() => setViewMode("private")}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs transition-all ${
+                            viewMode === "private" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Lock size={12} /> Private
+                        </button>
+                        <button 
+                          onClick={() => setViewMode("public")}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs transition-all ${
+                            viewMode === "public" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Globe size={12} /> Public
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <WritingAvatar />
                 </div>
