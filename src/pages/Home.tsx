@@ -13,6 +13,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Globe, Lock } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/use-auth";
 
 // --- Constants ---
 
@@ -185,7 +186,8 @@ const parseChecklist = (content: string): { text: string; checked: boolean }[] |
 
 const Home = () => {
   const isMobile = useIsMobile();
-  const isOwner = new URLSearchParams(window.location.search).has("admin");
+  const { user, signOut } = useAuth();
+  const isOwner = !!user;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { pins, setPins, addPin, updatePin, deletePin: deletePinDb } = useJournalEntries();
@@ -489,6 +491,17 @@ const Home = () => {
               <Icon size={13} /> {label}
             </a>
           ))}
+          {isOwner ? (
+            <button onClick={signOut}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-background/50 text-xs font-body text-foreground/70 hover:text-foreground hover:border-destructive/40 transition-colors">
+              <Lock size={13} /> Sign out
+            </button>
+          ) : (
+            <a href="/login"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-background/50 text-xs font-body text-foreground/70 hover:text-foreground hover:border-accent/40 transition-colors">
+              <Lock size={13} /> Admin
+            </a>
+          )}
         </div>
       </motion.div>
 
