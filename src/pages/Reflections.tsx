@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, ChevronDown, ChevronLeft, Pen, BookMarked, Sparkles, Plus, Upload, FileText, Calendar } from "lucide-react";
+import { BookOpen, ChevronLeft, Pen, BookMarked, Sparkles, Plus, Upload, FileText } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useJournalEntries } from "@/hooks/use-journal";
@@ -17,7 +17,7 @@ const Reflections = () => {
   const { pins, addPin } = useJournalEntries();
   const { user } = useAuth();
   const isOwner = !!user;
-  const [expandedTag, setExpandedTag] = useState<string | null>(null);
+  
   const [expandedPinId, setExpandedPinId] = useState<string | null>(null);
   const [isWriting, setIsWriting] = useState(false);
   const [writeContent, setWriteContent] = useState("");
@@ -211,56 +211,49 @@ const Reflections = () => {
             )}
           </motion.div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-6">
             {Object.entries(grouped).map(([tagKey, tagPins]) => {
               const config = REFLECTION_TAGS[tagKey];
               const Icon = config?.icon;
-              const isOpen = expandedTag === tagKey;
               return (
-                <motion.div key={tagKey} className="rounded-2xl border border-border bg-card overflow-hidden" layout>
-                  <button onClick={() => setExpandedTag(isOpen ? null : tagKey)}
-                    className="w-full flex items-center gap-3 p-4 hover:bg-muted/30 transition-colors">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${config?.accent || "bg-muted text-muted-foreground"}`}>
-                      {Icon && <Icon size={15} />}
+                <div key={tagKey}>
+                  <div className="flex items-center gap-2 mb-3 px-1">
+                    <div className={`w-6 h-6 rounded-md flex items-center justify-center ${config?.accent || "bg-muted text-muted-foreground"}`}>
+                      {Icon && <Icon size={12} />}
                     </div>
-                    <span className="font-body text-sm font-medium text-foreground flex-1 text-left">{config?.label || tagKey}</span>
-                    <span className="font-body text-xs text-muted-foreground/60 mr-2">{tagPins.length}</span>
-                    <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                      <ChevronDown size={14} className="text-muted-foreground/40" />
-                    </motion.div>
-                  </button>
-                  <AnimatePresence>
-                    {isOpen && (
-                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.25 }} className="overflow-hidden border-t border-border/30">
-                        <div className="p-3 space-y-1">
-                          {tagPins.map((pin, i) => (
-                            <motion.div key={pin.id} onClick={() => setExpandedPinId(pin.id)}
-                              initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
-                              className="flex items-start gap-3 py-3 px-3 rounded-xl cursor-pointer hover:bg-muted/40 transition-colors group">
-                              <div className="mt-0.5 w-7 h-7 rounded-lg bg-muted/60 flex items-center justify-center shrink-0">
-                                <FileText size={13} className="text-muted-foreground/50" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-body text-sm font-medium text-foreground truncate">{pin.content.split("\n")[0]}</p>
-                                {getPreviewText(pin.content) && (
-                                  <p className="font-body text-xs text-muted-foreground/40 mt-0.5 truncate">{getPreviewText(pin.content)}</p>
-                                )}
-                                <div className="flex items-center gap-1.5 mt-1.5">
-                                  <Calendar size={10} className="text-muted-foreground/30" />
-                                  <p className="font-body text-[11px] text-muted-foreground/40">
-                                    {new Date(pin.createdAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                                  </p>
-                                </div>
-                              </div>
-                              <ChevronLeft size={14} className="text-muted-foreground/20 rotate-180 group-hover:text-muted-foreground transition-colors shrink-0 mt-1" />
-                            </motion.div>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                    <span className="font-body text-xs font-medium text-muted-foreground uppercase tracking-wider">{config?.label || tagKey}</span>
+                    <span className="font-body text-[11px] text-muted-foreground/40">({tagPins.length})</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {tagPins.map((pin, i) => {
+                      const title = pin.content.split("\n")[0];
+                      const preview = getPreviewText(pin.content);
+                      const wordCount = pin.content.split(/\s+/).length;
+                      return (
+                        <motion.div key={pin.id} onClick={() => setExpandedPinId(pin.id)}
+                          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+                          className="rounded-2xl border border-border bg-card p-4 cursor-pointer hover:bg-muted/30 hover:border-foreground/10 transition-all group flex flex-col">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${config?.accent || "bg-muted text-muted-foreground"}`}>
+                              <FileText size={13} />
+                            </div>
+                            <ChevronLeft size={12} className="text-muted-foreground/20 rotate-180 group-hover:text-muted-foreground transition-colors mt-0.5" />
+                          </div>
+                          <p className="font-body text-sm font-medium text-foreground line-clamp-2 mb-1.5 leading-snug">{title}</p>
+                          {preview && (
+                            <p className="font-body text-xs text-muted-foreground/40 line-clamp-3 leading-relaxed mb-3 flex-1">{preview}</p>
+                          )}
+                          <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/20">
+                            <p className="font-body text-[10px] text-muted-foreground/30">
+                              {new Date(pin.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </p>
+                            <p className="font-body text-[10px] text-muted-foreground/30">{wordCount} words</p>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </div>
