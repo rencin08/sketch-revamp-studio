@@ -190,7 +190,6 @@ const Home = () => {
   const { user, signOut } = useAuth();
   const isOwner = !!user;
   const [collapsed, setCollapsed] = useState(false);
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { pins, setPins, addPin, updatePin, deletePin: deletePinDb } = useJournalEntries();
   const { chatMessages, sendMessage } = useChatMessages();
@@ -507,167 +506,42 @@ const Home = () => {
         </div>
       </motion.div>
 
-      {/* Reflections & Thoughts - Expandable */}
-      <motion.div variants={item} className="relative rounded-2xl bg-card border border-border overflow-hidden">
-        <button
-          onClick={() => setExpandedSections(s => ({ ...s, reflections: !s.reflections }))}
-          className="w-full p-5 text-left cursor-pointer hover:bg-accent/5 transition-colors group"
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center mb-3">
-                <BookOpen size={18} className="text-secondary-foreground" />
-              </div>
-              <p className="font-body text-xs tracking-widest text-accent uppercase mb-1">Thoughts & Reflections</p>
-              <h3 className="font-display text-lg text-foreground mb-1">Reflections & thoughts</h3>
-              <p className="font-body text-sm text-muted-foreground">On leaving finance, building startups, and figuring out life in your 20s.</p>
-              <Link to="/reflections" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 mt-2 font-body text-xs text-accent hover:text-accent/80 transition-colors">
-                Open page <ArrowRight size={12} />
-              </Link>
-            </div>
-            <motion.div animate={{ rotate: expandedSections.reflections ? 180 : 0 }} transition={{ duration: 0.2 }} className="mt-2 shrink-0 ml-2">
-              <ChevronDown size={16} className="text-muted-foreground" />
-            </motion.div>
+      {/* Reflections & Thoughts - Click to navigate */}
+      <Link to="/reflections">
+        <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-5 cursor-pointer hover:border-accent/30 transition-colors group">
+          <MacDots />
+          <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center mb-3">
+            <BookOpen size={18} className="text-secondary-foreground" />
           </div>
-        </button>
-        <AnimatePresence>
-          {expandedSections.reflections && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="overflow-hidden border-t border-border/40"
-            >
-              <div className="p-4 space-y-1">
-                {(() => {
-                  const reflectionTags = ["journal", "note", "random"];
-                  const reflectionPins = pins.filter(p => !p.archived && p.tags.some(t => reflectionTags.includes(t)));
-                  const grouped: Record<string, PinItem[]> = {};
-                  reflectionPins.forEach(p => {
-                    const tag = p.tags.find(t => reflectionTags.includes(t)) || "note";
-                    if (!grouped[tag]) grouped[tag] = [];
-                    grouped[tag].push(p);
-                  });
-                  if (reflectionPins.length === 0) {
-                    return <p className="font-body text-xs text-muted-foreground/50 py-2 text-center italic">no entries yet</p>;
-                  }
-                  return Object.entries(grouped).map(([tagKey, tagItems]) => {
-                    const config = TAGS[tagKey];
-                    const Icon = config?.icon;
-                    return (
-                      <div key={tagKey}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setExpandedSections(s => ({ ...s, [`ref_${tagKey}`]: !s[`ref_${tagKey}`] })); }}
-                          className="flex items-center gap-2 w-full py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors"
-                        >
-                          {Icon && <Icon size={13} className="text-muted-foreground" />}
-                          <span className="font-body text-xs tracking-wider text-muted-foreground uppercase flex-1 text-left">{config?.label || tagKey}</span>
-                          <span className="font-body text-[10px] text-muted-foreground mr-1">{tagItems.length}</span>
-                          <motion.div animate={{ rotate: expandedSections[`ref_${tagKey}`] ? 180 : 0 }} transition={{ duration: 0.15 }}>
-                            <ChevronDown size={12} className="text-muted-foreground/50" />
-                          </motion.div>
-                        </button>
-                        <AnimatePresence>
-                          {expandedSections[`ref_${tagKey}`] && (
-                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden pl-7 space-y-0.5">
-                              {tagItems.map(pin => (
-                                <div key={pin.id} onClick={() => setExpandedPinId(pin.id)}
-                                  className="py-1.5 px-2 rounded-lg cursor-pointer hover:bg-muted/40 transition-colors">
-                                  <p className="font-body text-xs text-foreground truncate">{pin.content.split("\n")[0]}</p>
-                                  <p className="font-body text-[10px] text-muted-foreground/50">{new Date(pin.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
-                                </div>
-                              ))}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+          <p className="font-body text-xs tracking-widest text-accent uppercase mb-1">Thoughts & Reflections</p>
+          <h3 className="font-display text-lg text-foreground mb-1">Reflections & thoughts</h3>
+          <p className="font-body text-sm text-muted-foreground">On leaving finance, building startups, and figuring out life in your 20s.</p>
+          <ArrowRight size={14} className="text-accent mt-3 group-hover:translate-x-1 transition-transform" />
+        </motion.div>
+      </Link>
 
-      {/* Small widgets - also expandable */}
+      {/* Small widgets */}
       <div className="grid grid-cols-2 gap-3">
-        <motion.div variants={item} className="relative rounded-2xl bg-card border border-border overflow-hidden">
-          <button
-            onClick={() => setExpandedSections(s => ({ ...s, aihub: !s.aihub }))}
-            className="w-full p-4 text-left cursor-pointer hover:bg-accent/5 transition-colors"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center">
-                <Sparkles size={16} className="text-primary" />
-              </div>
-              <motion.div animate={{ rotate: expandedSections.aihub ? 180 : 0 }} transition={{ duration: 0.15 }}>
-                <ChevronDown size={12} className="text-muted-foreground/50" />
-              </motion.div>
+        <Link to="/ai-hub">
+          <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-accent/30 transition-colors group">
+            <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center mb-2">
+              <Sparkles size={16} className="text-primary" />
             </div>
             <h3 className="font-display text-sm text-foreground">AI Hub</h3>
             <p className="font-body text-xs text-muted-foreground mt-0.5">Learning notes</p>
-            <Link to="/ai-hub" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 mt-1.5 font-body text-[10px] text-accent hover:text-accent/80 transition-colors">
-              Open <ArrowRight size={10} />
-            </Link>
-          </button>
-          <AnimatePresence>
-            {expandedSections.aihub && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-border/40">
-                <div className="p-3 space-y-1">
-                  {(() => {
-                    const aiPins = pins.filter(p => !p.archived && p.tags.includes("idea"));
-                    if (aiPins.length === 0) return <p className="font-body text-[10px] text-muted-foreground/50 text-center italic py-1">no ideas yet</p>;
-                    return aiPins.slice(0, 5).map(pin => (
-                      <div key={pin.id} onClick={() => setExpandedPinId(pin.id)} className="py-1 px-2 rounded-lg cursor-pointer hover:bg-muted/40 transition-colors">
-                        <p className="font-body text-[11px] text-foreground truncate">{pin.content.split("\n")[0]}</p>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        <motion.div variants={item} className="relative rounded-2xl bg-card border border-border overflow-hidden">
-          <button
-            onClick={() => setExpandedSections(s => ({ ...s, projects: !s.projects }))}
-            className="w-full p-4 text-left cursor-pointer hover:bg-accent/5 transition-colors"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center">
-                <Briefcase size={16} className="text-accent" />
-              </div>
-              <motion.div animate={{ rotate: expandedSections.projects ? 180 : 0 }} transition={{ duration: 0.15 }}>
-                <ChevronDown size={12} className="text-muted-foreground/50" />
-              </motion.div>
+            <ArrowRight size={12} className="text-accent mt-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+          </motion.div>
+        </Link>
+        <Link to="/projects">
+          <motion.div variants={item} className="relative rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-accent/30 transition-colors group">
+            <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center mb-2">
+              <Briefcase size={16} className="text-accent" />
             </div>
             <h3 className="font-display text-sm text-foreground">Projects</h3>
             <p className="font-body text-xs text-muted-foreground mt-0.5">What I'm building</p>
-            <Link to="/projects" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 mt-1.5 font-body text-[10px] text-accent hover:text-accent/80 transition-colors">
-              Open <ArrowRight size={10} />
-            </Link>
-          </button>
-          <AnimatePresence>
-            {expandedSections.projects && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-border/40">
-                <div className="p-3 space-y-1">
-                  {(() => {
-                    const goalPins = pins.filter(p => !p.archived && p.tags.includes("goals"));
-                    if (goalPins.length === 0) return <p className="font-body text-[10px] text-muted-foreground/50 text-center italic py-1">no projects yet</p>;
-                    return goalPins.slice(0, 5).map(pin => (
-                      <div key={pin.id} onClick={() => setExpandedPinId(pin.id)} className="py-1 px-2 rounded-lg cursor-pointer hover:bg-muted/40 transition-colors">
-                        <p className="font-body text-[11px] text-foreground truncate">{pin.content.split("\n")[0]}</p>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+            <ArrowRight size={12} className="text-accent mt-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+          </motion.div>
+        </Link>
       </div>
 
     </motion.div>
