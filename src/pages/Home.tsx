@@ -10,6 +10,7 @@ import {
   Search
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { Globe, Lock } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -520,6 +521,9 @@ const Home = () => {
               <p className="font-body text-xs tracking-widest text-accent uppercase mb-1">Thoughts & Reflections</p>
               <h3 className="font-display text-lg text-foreground mb-1">Reflections & thoughts</h3>
               <p className="font-body text-sm text-muted-foreground">On leaving finance, building startups, and figuring out life in your 20s.</p>
+              <Link to="/reflections" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 mt-2 font-body text-xs text-accent hover:text-accent/80 transition-colors">
+                Open page <ArrowRight size={12} />
+              </Link>
             </div>
             <motion.div animate={{ rotate: expandedSections.reflections ? 180 : 0 }} transition={{ duration: 0.2 }} className="mt-2 shrink-0 ml-2">
               <ChevronDown size={16} className="text-muted-foreground" />
@@ -604,6 +608,9 @@ const Home = () => {
             </div>
             <h3 className="font-display text-sm text-foreground">AI Hub</h3>
             <p className="font-body text-xs text-muted-foreground mt-0.5">Learning notes</p>
+            <Link to="/ai-hub" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 mt-1.5 font-body text-[10px] text-accent hover:text-accent/80 transition-colors">
+              Open <ArrowRight size={10} />
+            </Link>
           </button>
           <AnimatePresence>
             {expandedSections.aihub && (
@@ -639,6 +646,9 @@ const Home = () => {
             </div>
             <h3 className="font-display text-sm text-foreground">Projects</h3>
             <p className="font-body text-xs text-muted-foreground mt-0.5">What I'm building</p>
+            <Link to="/projects" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 mt-1.5 font-body text-[10px] text-accent hover:text-accent/80 transition-colors">
+              Open <ArrowRight size={10} />
+            </Link>
           </button>
           <AnimatePresence>
             {expandedSections.projects && (
